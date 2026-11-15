@@ -1,0 +1,15 @@
+<Solution>
+  <Project Path="F1MauiApp.Droid/F1MauiApp.Droid.csproj">
+    <Deploy />
+  </Project>
+  <Project Path="F1MauiApp.iOS/F1MauiApp.iOS.csproj">
+    <Deploy />
+  </Project>
+  <Project Path="F1MauiApp.Mac/F1MauiApp.Mac.csproj">
+    <Deploy />
+  </Project>
+  <Project Path="F1MauiApp.WinUI/F1MauiApp.WinUI.csproj">
+    <Platform Project="x64" />
+  </Project>
+  <Project Path="F1MauiApp/F1MauiApp.csproj" />
+</Solution>

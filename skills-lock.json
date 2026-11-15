@@ -1,0 +1,83 @@
+{
+  "version": 2,
+  "skills": {
+    "applicationinsights-web-ts": {
+      "source": "microsoft/skills",
+      "sourceType": "github",
+      "skillPath": ".github/skills/applicationinsights-web-ts/SKILL.md",
+      "computedHash": "2ba6dbecac7a04e86dd21480e4fc511dc945c3b7f9ba19abc3455cf44d15199c"
+    },
+    "cloud-solution-architect": {
+      "source": "microsoft/skills",
+      "sourceType": "github",
+      "skillPath": ".github/skills/cloud-solution-architect/SKILL.md",
+      "computedHash": "f47d40453bc192606636106b39da487794a02f5db2f41170527d6fe05b8af06a"
+    },
+    "continual-learning": {
+      "source": "microsoft/skills",
+      "sourceType": "github",
+      "skillPath": ".github/skills/continual-learning/SKILL.md",
+      "computedHash": "b2cc65af1d656768776a67ac010ef52c84d50a524fe90964903f646263c73e26"
+    },
+    "copilot-sdk": {
+      "source": "microsoft/skills",
+      "sourceType": "github",
+      "skillPath": ".github/skills/copilot-sdk/SKILL.md",
+      "computedHash": "4ffea90affb2399448861e195b0c2d870ea193218ee528330c7e28f93a460628"
+    },
+    "debugview": {
+      "source": "microsoft/skills",
+      "sourceType": "github",
+      "skillPath": ".github/skills/debugview/SKILL.md",
+      "computedHash": "e633777a422e3637bce757b9515259939164789f794c677bb4346babe622d870"
+    },
+    "entra-agent-id": {
+      "source": "microsoft/skills",
+      "sourceType": "github",
+      "skillPath": ".github/skills/entra-agent-id/SKILL.md",
+      "computedHash": "a8ddfe795e9d40f9139d6d5ae33be96fcf9b0741bb318ab024b8d0a807a6b250"
+    },
+    "frontend-design-review": {
+      "source": "microsoft/skills",
+      "sourceType": "github",
+      "skillPath": ".github/skills/frontend-design-review/SKILL.md",
+      "computedHash": "79e26e53651e90a60c1b36284cf8edf5c7f0fba9e25058b47b2adf81f7e0bdef"
+    },
+    "github-issue-creator": {
+      "source": "microsoft/skills",
+      "sourceType": "github",
+      "skillPath": ".github/skills/github-issue-creator/SKILL.md",
+      "computedHash": "438e28e55b01cbc32378596d01c0609675976cf9e2b8275712d8dbc03407dd1e"
+    },
+    "kql": {
+      "source": "microsoft/skills",
+      "sourceType": "github",
+      "skillPath": ".github/skills/kql/SKILL.md",
+      "computedHash": "4f5845f7cca08cae2e1689ef5dc1e2bc8a2b2ce033c19f62ceeab500078dc4cf"
+    },
+    "mcp-builder": {
+      "source": "microsoft/skills",
+      "sourceType": "github",
+      "skillPath": ".github/skills/mcp-builder/SKILL.md",
+      "computedHash": "1d982851688265ea4739c2d66fca41995c8861a773962a5316c09f749ef4fd33"
+    },
+    "microsoft-docs": {
+      "source": "microsoft/skills",
+      "sourceType": "github",
+      "skillPath": ".github/skills/microsoft-docs/SKILL.md",
+      "computedHash": "ab0f71e078ec443d80314fd7b7adbeb566d24247ed3b76e6134d164e65d9b6e4"
+    },
+    "podcast-generation": {
+      "source": "microsoft/skills",
+      "sourceType": "github",
+      "skillPath": ".github/skills/podcast-generation/SKILL.md",
+      "computedHash": "6bbb7f8127a077a748b083d5808143c5c4f5016ae5801f19baee8b1c58f1a2f8"
+    },
+    "skill-creator": {
+      "source": "microsoft/skills",
+      "sourceType": "github",
+      "skillPath": ".github/skills/skill-creator/SKILL.md",
+      "computedHash": "63c53a94de7af0d7dbc9ffa9c34769e9e8b376d10eb5337ee081d28d85c9e70b"
+    }
+  }
+}
