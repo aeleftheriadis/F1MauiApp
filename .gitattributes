@@ -1,7 +1,9 @@
 ###############################################################################
 # Set default behavior to automatically normalize line endings.
+# eol=lf is explicit on purpose: .editorconfig declares end_of_line = lf, so a CRLF
+# checkout would make `dotnet format --verify-no-changes` fail for the whole team.
 ###############################################################################
-* text=auto
+* text=auto eol=lf
 
 ###############################################################################
 # Set default behavior for command prompt diff.

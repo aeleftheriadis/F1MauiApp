@@ -1,0 +1,34 @@
+<Project>
+
+  <PropertyGroup>
+    <LangVersion>15</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+    <Deterministic>true</Deterministic>
+
+    <!-- IDE0005 (dead usings) only reports on build when the compiler emits a doc file, so every
+         project emits one. The XML-doc obligation itself is scoped below. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+    <!-- Supply chain: every restore writes packages.lock.json so a version change is a reviewable
+         diff. Audit with `dotnet list package` using the vulnerable and include-transitive flags. -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+  </PropertyGroup>
+
+  <!-- The app shell and the tests are not API: missing doc comments are not a defect there. -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' != 'F1App.Domain' and '$(MSBuildProjectName)' != 'F1App.Telemetry'">
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <!-- Analysis only where the code is ours and the analyzers have a stable baseline.
+       MAUI/Android/iOS generated code is excluded from warnings-as-errors instead. -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'F1App.Domain' or '$(MSBuildProjectName)' == 'F1App.Telemetry'">
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <IsTrimmable>true</IsTrimmable>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+</Project>

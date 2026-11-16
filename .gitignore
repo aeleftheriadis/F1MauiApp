@@ -9,3 +9,11 @@ obj/
 
 # OS-generated files
 .DS_Store
+
+# Agent tooling - skills live in the user profile, never in the repository
+.agents/
+.claude/
+.codegraph/
+
+# Build/IDE state
+*.csproj.user

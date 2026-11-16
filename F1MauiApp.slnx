@@ -1,15 +1,20 @@
 <Solution>
-  <Project Path="F1MauiApp.Droid/F1MauiApp.Droid.csproj">
-    <Deploy />
-  </Project>
-  <Project Path="F1MauiApp.iOS/F1MauiApp.iOS.csproj">
-    <Deploy />
-  </Project>
-  <Project Path="F1MauiApp.Mac/F1MauiApp.Mac.csproj">
-    <Deploy />
-  </Project>
-  <Project Path="F1MauiApp.WinUI/F1MauiApp.WinUI.csproj">
-    <Platform Project="x64" />
-  </Project>
-  <Project Path="F1MauiApp/F1MauiApp.csproj" />
+  <Folder Name="/config/">
+    <File Path=".editorconfig" />
+    <File Path=".gitattributes" />
+    <File Path=".gitignore" />
+    <File Path="AGENTS.md" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="global.json" />
+    <File Path="nuget.config" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/F1App.App/F1App.App.csproj" />
+    <Project Path="src/F1App.Domain/F1App.Domain.csproj" />
+    <Project Path="src/F1App.Telemetry/F1App.Telemetry.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/F1App.Telemetry.Tests/F1App.Telemetry.Tests.csproj" />
+  </Folder>
 </Solution>
