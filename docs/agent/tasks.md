@@ -20,6 +20,11 @@ Open items from docs/plan.md (source of truth for detail and status):
 - [x] Desktop visual pass via `F1APP_SHOTS=1` screenshots — 8 defects found and fixed 2026-11-22
 - [ ] Phone visual pass (screenshots forced with F1APP_PHONE=1 still need a device for gestures/status bar)
 - [x] Crash clicking the pit-wall NEWS tab — fixed 2026-11-22 (hidden Media CollectionView was being repopulated)
+- [x] F1.com look and feel, phase 1 — palette, Barlow Semi Condensed (OFL), media catalogue, image resolver,
+      credited cutouts/cars on Paddock, circuit card on the Season hero (2026-11-22)
+- [ ] F1.com look and feel, phase 2 — per-row imagery was deliberately left out of the 1 100-row Archive, and
+      the HUD screens have no hero art because `SessionRequest` carries no meeting name. Both are recorded as
+      rulings in the SDD ledger; adding a meeting name to the request unlocks the HUD hero.
 - [ ] Static event leaks: `Themes.Changed` and the singleton `NewsViewModel.PropertyChanged` are subscribed in
       every page constructor and never unsubscribed — closed pages still rebuild content. Not the cause of the
       NEWS crash, but the same class of "touch a closed view" failure.

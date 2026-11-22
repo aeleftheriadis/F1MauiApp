@@ -119,10 +119,15 @@ public static class Surfaces
         }
     }
 
-    /// <summary>Prose label in the platform's own font at <paramref name="size"/>.</summary>
+    /// <summary>Prose label in the display family: bold is the heading weight, regular is body.</summary>
+    /// <remarks>
+    /// One change here re-skins every screen's prose, which is the point of routing type through a single
+    /// helper. Numerals keep <see cref="Mono"/> so timing columns still align.
+    /// </remarks>
     public static Label Text(string text, double size, Color colour, bool bold = false) => new()
     {
         Text = text,
+        FontFamily = bold ? Tokens.DisplayFont : Tokens.BodyFont,
         FontSize = size,
         FontAttributes = bold ? FontAttributes.Bold : FontAttributes.None,
         TextColor = colour,

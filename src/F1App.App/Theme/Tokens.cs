@@ -28,6 +28,19 @@ public static class Tokens
     /// WinUI resolve a system family, and that probe logs an error for every label. Numerals there fall
     /// back to the system face - a dev-target compromise, since Windows is not a shipping target.
     /// </remarks>
+    /// <summary>The display face: a condensed grotesque, the closest open relative of F1's own.</summary>
+    /// <remarks>
+    /// Barlow Semi Condensed, SIL Open Font License 1.1 (see Resources/Fonts/OFL.txt). Two weights and a
+    /// body weight, not nine: a font file set is a licence and a size cost on every platform.
+    /// </remarks>
+    public const string DisplayFont = "BarlowBold";
+
+    /// <summary>Body weight of the display family.</summary>
+    public const string BodyFont = "BarlowRegular";
+
+    /// <summary>Semi-bold, for labels, codes and section headings.</summary>
+    public const string CodeFont = "BarlowSemiBold";
+
     public static string? MonoFont =>
         DeviceInfo.Current.Platform == DevicePlatform.Android ? "monospace"
         : DeviceInfo.Current.Platform == DevicePlatform.iOS ? "Menlo"
@@ -62,9 +75,9 @@ public static class Tokens
     /// <summary>Gap kept between adjacent touchables.</summary>
     public const double TouchSpacing = 8;
 
-    // Radii
-    public const double RadiusSmall = 6;
-    public const double RadiusCard = 14;
+    // Radii: squarer than they were. F1.com's cards read as panels, not as rounded tiles.
+    public const double RadiusSmall = 2;
+    public const double RadiusCard = 4;
 
     /// <summary>
     /// Elevation for cards, softer in the light palette where a hard shadow reads as a smudge.

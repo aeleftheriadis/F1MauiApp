@@ -21,7 +21,7 @@ public sealed class WeekendPage : ContentPage
         Content = BuildContent();
 
         // The palette swap is the C# equivalent of a dictionary swap: rebuild from the new palette.
-        Themes.Changed += (_, _) => Content = BuildContent();
+        Themes.RebuildOnChange(this, BuildContent);
 
         // The phase only changes at session boundaries; a 30 s re-evaluation keeps the countdown honest
         // without touching the network.

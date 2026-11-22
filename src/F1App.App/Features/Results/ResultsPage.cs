@@ -62,7 +62,7 @@ public sealed class ResultsPage : ContentPage
         Content = BuildContent();
 
         // The palette swap is the C# equivalent of a dictionary swap: rebuild from the new palette.
-        Themes.Changed += (_, _) => Content = BuildContent();
+        Themes.RebuildOnChange(this, BuildContent);
 
         A11y.WatchStatus(_viewModel, nameof(ResultsViewModel.Status), () => _viewModel.Status);
 

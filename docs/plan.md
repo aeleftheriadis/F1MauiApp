@@ -132,6 +132,16 @@ Paddock opened with an empty dossier while its duel lines already named a driver
 fill-cropped to a chin, the race-control strip showed four identical `CLEAR` lines because *CLEAR is itself a
 flag value*, and the decade picker was squeezed to its text width.
 
+## Credits and licences shipped in the app
+
+- **Barlow Semi Condensed** — SIL Open Font License 1.1, Copyright 2017 The Barlow Project Authors. Files and
+  `OFL.txt` live in `src/F1App.App/Resources/Fonts/`. It is the open substitute for F1's own display face.
+- **Formula 1 media** — driver cutouts, team cars, team logos and circuit cards, hotlinked from
+  `media.formula1.com` and credited on screen, never stored or redistributed (ADR-019).
+- **Wikimedia Commons** — freely licensed portraits, used where F1 media has none, with author and licence
+  printed beside the picture.
+- **OpenF1** images — track icons and flags shipped in its payloads, credited the same way.
+
 ## Real clicks, not just navigation
 
 `F1APP_CLICK=1` sends a **real mouse click** at a pit-wall tab's screen position (`SetCursorPos` +

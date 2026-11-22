@@ -124,3 +124,19 @@ Evidence, measurements and dead ends. Newest last.
 - Found while bisecting, not fixed: `Themes.Changed` (a static event) and `NewsViewModel.PropertyChanged`
   (a singleton view model) are subscribed by every page constructor and never unsubscribed, so closed pages stay
   reachable and rebuild their content. Recorded as an open item in tasks.md.
+- 2026-11-22 **Jolpica rate limit, verified**: the published figures are burst **4 requests/second** and
+  sustained **500 requests/hour** (unauthenticated), from `jolpica/jolpica-f1/docs/rate_limits.md`. The app had
+  been pacing Jolpica at **120/min (~7 200/hour) in one bucket plus a second 120/min bucket for the champions
+  wall**, i.e. roughly fifteen times the published budget - and two buckets defeat the point of a gate, since
+  the limit is counted per IP. Now one gate: `ProviderLimits.JolpicaPerMinute = 8` (480/hour) with burst 4,
+  injected into every Jolpica client. `ProviderLimitsTests` asserts the arithmetic so the figure cannot drift
+  back. Consequence, stated plainly: a first full vault sync (77 seasons) now takes about ten minutes instead
+  of one, which is why the Archive reports "syncing archive: N/77 seasons" and the sync resumes where it stops.
+- 2026-11-22 **F1 media CDN, measured** (all keyless): driver cutouts at
+  `.../common/f1/2026/<team>/<drvid>/2026<team><drvid>right.webp` — 24/24 answered 200 at `w_720` (124 KB);
+  team cars `2026<team>carright.webp` — 11/11 200, 20–41 KB, and `w_2000` also 200; team logos
+  `2026<team>logowhite.webp` 746 B; circuit cards `fom-website/static-assets/2026/races/card/<slug>.webp` —
+  22 of 23 200, **`united-arab-emirates` is 404** (the official calendar page publishes no card for that
+  round either). Paths are constructed, not published as a contract: OpenF1's `headshot_url` is a different,
+  older scheme (`content/dam/fom-website/drivers/...transform/1col/image.png`, the 93 px crop), so the good
+  cutouts exist only in a table of verified ids, with fallbacks.

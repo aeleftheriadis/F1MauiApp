@@ -75,7 +75,7 @@ public sealed class TrackMapPage : ContentPage, IDisposable
         Content = BuildContent();
 
         // The palette swap is the C# equivalent of a dictionary swap: rebuild from the new palette.
-        Themes.Changed += (_, _) => Content = BuildContent();
+        Themes.RebuildOnChange(this, BuildContent);
 
         // Markers only exist while the map on screen is the session being replayed.
         _markerTimer = Dispatcher.CreateTimer();

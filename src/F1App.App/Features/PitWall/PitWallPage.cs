@@ -31,6 +31,7 @@ public sealed class PitWallPage : ContentPage, IDisposable
 
     private readonly PitWallViewModel _viewModel;
     private readonly NewsViewModel _news;
+    private readonly System.ComponentModel.PropertyChangedEventHandler _onNewsChanged;
     private readonly SessionRunner _runner;
 
     private readonly ObservableCollection<NewsRow> _visibleNews = [];
@@ -86,14 +87,18 @@ public sealed class PitWallPage : ContentPage, IDisposable
             }
         };
 
-        _news.PropertyChanged += (_, _) =>
+        // Subscribed between load and unload: the view model is a singleton, so a page that listens from
+        // its constructor stays reachable after it is closed and rebuilds lists nobody can see.
+        _onNewsChanged = (_, _) =>
         {
             if (_section is Section.News or Section.Media)
             {
                 RebuildNews();
             }
         };
-        Themes.Changed += (_, _) => Content = BuildContent();
+        Loaded += (_, _) => _news.PropertyChanged += _onNewsChanged;
+        Unloaded += (_, _) => _news.PropertyChanged -= _onNewsChanged;
+        Themes.RebuildOnChange(this, BuildContent);
         A11y.WatchStatus(_viewModel, nameof(PitWallViewModel.Status), () => _viewModel.Status);
     }
 

@@ -75,6 +75,42 @@ public static class Themes
         }
     }
 
+    /// <summary>
+    /// Rebuilds a page's content on every palette change, for as long as the page is on screen.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="Changed"/> is static, so a page that subscribes from its constructor and never
+    /// unsubscribes is kept alive for the life of the app and goes on rebuilding its content after it has
+    /// been closed - the whole "touch a view whose native peer is gone" failure family. Listening only
+    /// between load and unload bounds it to the time the page can actually be seen. The flag makes a
+    /// repeated Loaded event harmless.
+    /// </remarks>
+    public static void RebuildOnChange(ContentPage page, Func<View> build)
+    {
+        ArgumentNullException.ThrowIfNull(page);
+        ArgumentNullException.ThrowIfNull(build);
+
+        EventHandler onChanged = (_, _) => page.Content = build();
+        var listening = false;
+
+        page.Loaded += (_, _) =>
+        {
+            if (listening)
+            {
+                return;
+            }
+
+            listening = true;
+            Changed += onChanged;
+        };
+
+        page.Unloaded += (_, _) =>
+        {
+            Changed -= onChanged;
+            listening = false;
+        };
+    }
+
     /// <summary>Applies a mode, persists it, and asks the open screens to rebuild.</summary>
     public static void Apply(ThemeMode mode, bool persist = true)
     {

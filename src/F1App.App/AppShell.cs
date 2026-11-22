@@ -230,6 +230,16 @@ public sealed partial class AppShell : Shell
             {
                 await WalkOneAsync($"//{route}", route);
 
+                if (route == "season" && Environment.GetEnvironmentVariable("F1APP_THEMEFLIP") == "1")
+                {
+                    Themes.Apply(ThemeMode.Light);
+                    await Task.Delay(900);
+                    await CaptureAsync("theme-light");
+                    Themes.Apply(ThemeMode.Dark);
+                    await Task.Delay(900);
+                    await CaptureAsync("theme-dark");
+                }
+
                 if (route == "pitwall" && Shell.Current?.CurrentPage is PitWallPage pit)
                 {
                     await PressPitWallTabsAsync(pit);

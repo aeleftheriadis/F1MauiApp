@@ -33,7 +33,7 @@ public sealed class ArchivePage : ContentPage
         Content = BuildContent();
 
         A11y.WatchStatus(_viewModel, nameof(ArchiveViewModel.Status), () => _viewModel.Status);
-        Themes.Changed += (_, _) => Content = BuildContent();
+        Themes.RebuildOnChange(this, BuildContent);
     }
 
     /// <inheritdoc />

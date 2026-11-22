@@ -8,14 +8,18 @@ public sealed class SeasonHubPage : ContentPage
 {
     private readonly SeasonHubViewModel _viewModel;
     private readonly Picker _year;
+    private readonly Image _heroArt = new();
+    private readonly F1Images _images;
     private bool _loaded;
     private readonly WidthSwitch _width;
 
-    public SeasonHubPage(SeasonHubViewModel viewModel)
+    public SeasonHubPage(SeasonHubViewModel viewModel, F1Images images)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
+        ArgumentNullException.ThrowIfNull(images);
 
         _viewModel = viewModel;
+        _images = images;
         BindingContext = viewModel;
         _width = new WidthSwitch(Responsive.IsWideAt(Width), () => Content = BuildContent());
         Title = "Season";
@@ -42,7 +46,7 @@ public sealed class SeasonHubPage : ContentPage
 
         Content = BuildContent();
 
-        Themes.Changed += (_, _) => Content = BuildContent();
+        Themes.RebuildOnChange(this, BuildContent);
         A11y.WatchStatus(_viewModel, nameof(SeasonHubViewModel.Status), () => _viewModel.Status);
     }
 
@@ -66,11 +70,29 @@ public sealed class SeasonHubPage : ContentPage
         _ = LoadAsync(refresh: false);
     }
 
+    /// <summary>Loads the next race's circuit card, and leaves the panel empty when it cannot.</summary>
+    private async Task ApplyHeroArtAsync()
+    {
+        try
+        {
+            var art = await _images
+                .CircuitForMeetingAsync(_viewModel.HeroTitle, CancellationToken.None)
+                .ConfigureAwait(true);
+
+            _heroArt.Source = art;
+        }
+        catch (Exception exception)
+        {
+            Diagnostics.Write("PAGE", exception, "season hero art");
+        }
+    }
+
     private async Task LoadAsync(bool refresh)
     {
         try
         {
             await _viewModel.LoadAsync(refresh, CancellationToken.None);
+            await ApplyHeroArtAsync();
         }
         catch (Exception exception)
         {
@@ -115,12 +137,25 @@ public sealed class SeasonHubPage : ContentPage
             },
         };
 
+        // The next race is the screen's focal point, so it carries the circuit artwork; the rounds keep their
+        // text rows. A thumbnail on every row would put 23 remote images behind a scroll for one screenful.
+        _heroArt.Aspect = Aspect.AspectFill;
+        _heroArt.HeightRequest = 118;
+        var heroArtFrame = new Border
+        {
+            StrokeThickness = 0,
+            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 4 },
+            BackgroundColor = Themes.Current.SurfaceMuted,
+            Content = _heroArt,
+        };
+
         var hero = Surfaces.Card(
             new VerticalStackLayout
             {
                 Spacing = 2,
                 Children =
                 {
+                    heroArtFrame,
                     Surfaces.Mono("NEXT RACE", 10, Themes.Current.LiveText, bold: true),
                     Bind(Surfaces.Text("—", Tokens.FontSubtitle, Themes.Current.TextPrimary, bold: true),
                         Label.TextProperty, nameof(SeasonHubViewModel.HeroTitle)),

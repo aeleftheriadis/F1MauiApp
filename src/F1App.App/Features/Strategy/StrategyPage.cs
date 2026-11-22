@@ -38,7 +38,7 @@ public sealed class StrategyPage : ContentPage
 
         Content = BuildContent();
         A11y.WatchStatus(_viewModel, nameof(StrategyViewModel.Status), () => _viewModel.Status);
-        Themes.Changed += (_, _) => Content = BuildContent();
+        Themes.RebuildOnChange(this, BuildContent);
     }
 
     private View BuildContent()

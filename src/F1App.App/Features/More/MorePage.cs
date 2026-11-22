@@ -16,7 +16,7 @@ public sealed class MorePage : ContentPage
         BackgroundColor = Themes.Current.Background;
         SafeAreaEdges = SafeAreaEdges.Container;
         Content = BuildContent();
-        Themes.Changed += (_, _) => Content = BuildContent();
+        Themes.RebuildOnChange(this, BuildContent);
     }
 
     private static View BuildContent()
