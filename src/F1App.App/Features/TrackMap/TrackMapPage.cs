@@ -154,12 +154,22 @@ public sealed class TrackMapPage : ContentPage, IDisposable
             Spacing = Tokens.Space2,
             Children =
             {
-                Bind(new Label
+                new HorizontalStackLayout
                 {
-                    FontSize = Tokens.FontTitle,
-                    FontAttributes = FontAttributes.Bold,
-                    TextColor = Themes.Current.TextPrimary,
-                }, Label.TextProperty, nameof(CircuitMapViewModel.Headline)),
+                    Spacing = Tokens.Space2,
+                    Children =
+                    {
+                        Bind(new Label
+                        {
+                            FontSize = Tokens.FontTitle,
+                            FontAttributes = FontAttributes.Bold,
+                            TextColor = Themes.Current.TextPrimary,
+                            VerticalTextAlignment = TextAlignment.Center,
+                        }, Label.TextProperty, nameof(CircuitMapViewModel.Headline)),
+                        ProviderImage(nameof(CircuitMapViewModel.CountryFlagUrl), 22, 15),
+                        ProviderImage(nameof(CircuitMapViewModel.TrackIconUrl), 44, 33),
+                    },
+                },
                 _picker,
                 Bind(new Label
                 {
@@ -175,10 +185,12 @@ public sealed class TrackMapPage : ContentPage, IDisposable
                 }, Label.TextProperty, nameof(CircuitMapViewModel.Winners)),
                 Bind(new Label
                 {
-                    FontSize = Tokens.FontCaption,
+                    FontSize = 9,
                     FontFamily = Tokens.MonoFont,
-                    TextColor = Themes.Current.LiveText,
-                }, Label.TextProperty, nameof(CircuitMapViewModel.Status)),
+                    TextColor = Themes.Current.TextSecondary,
+                }, Label.TextProperty, nameof(CircuitMapViewModel.ImageCredit)),
+                CircuitPhoto(),
+                Surfaces.StatusBar(_viewModel, nameof(CircuitMapViewModel.Status), nameof(CircuitMapViewModel.IsBusy)),
             },
         };
 
@@ -195,6 +207,51 @@ public sealed class TrackMapPage : ContentPage, IDisposable
         layout.Add(header, 0, 0);
         layout.Add(_canvas, 0, 1);
         return layout;
+    }
+
+    /// <summary>A provider-published image, hidden when the field is empty rather than drawn as a blank box.</summary>
+    private static View ProviderImage(string path, double width, double height)
+    {
+        var image = new Image
+        {
+            Aspect = Aspect.AspectFit,
+            WidthRequest = width,
+            HeightRequest = height,
+            VerticalOptions = LayoutOptions.Center,
+        };
+        image.SetBinding(Image.SourceProperty, path);
+        image.SetBinding(
+            IsVisibleProperty,
+            new Binding(path, converter: new NotNullOrEmptyConverter()));
+
+        return image;
+    }
+
+    /// <summary>
+    /// The circuit's Commons photo with its attribution. Hidden entirely when there is none, because a
+    /// grey box reads as a broken image rather than as "no photo published".
+    /// </summary>
+    private View CircuitPhoto()
+    {
+        var image = new Image
+        {
+            Aspect = Aspect.AspectFill,
+            HeightRequest = 132,
+            BackgroundColor = Themes.Current.SurfaceMuted,
+        };
+        image.SetBinding(Image.SourceProperty, nameof(CircuitMapViewModel.PhotoUrl));
+
+        var caption = Surfaces.Mono(string.Empty, 9, Themes.Current.TextSecondary);
+        caption.SetBinding(Label.TextProperty, nameof(CircuitMapViewModel.PhotoCaption));
+
+        // One binding hides the whole block: an Image bound to null still takes its height and draws an
+        // empty rectangle, which reads as a broken picture.
+        var block = new VerticalStackLayout { Spacing = 2, Children = { image, caption } };
+        block.SetBinding(
+            IsVisibleProperty,
+            new Binding(nameof(CircuitMapViewModel.PhotoUrl), converter: new NotNullOrEmptyConverter()));
+
+        return block;
     }
 
     private void OnPaintSurface(object? sender, SKPaintSurfaceEventArgs e)

@@ -13,7 +13,7 @@ Every data source must be public, free and anonymous: **no API key, no OAuth, no
 
 | Source | Used for | Auth | Free-tier limit |
 | --- | --- | --- | --- |
-| OpenF1 (`api.openf1.org/v1`) | meetings, sessions, `location`, `car_data`, `laps`, `intervals`, `stints`, `pit`, `position` — 2023 onwards, including the next season's calendar (verified: 2027 lists 24 circuits, Mar–Dec) | none | 3 req/s, 30 req/min (enforced: a burst of 5 returns 429) |
+| OpenF1 (`api.openf1.org/v1`) — full endpoint inventory and the measured state of every unused endpoint are in `docs/plan.md` | meetings, sessions, `location`, `car_data`, `laps`, `intervals`, `stints`, `pit`, `position` — 2023 onwards, including the next season's calendar (verified: 2027 lists 24 circuits, Mar–Dec) | none | 3 req/s, 30 req/min (enforced: a burst of 5 returns 429) |
 | Jolpica-F1 (`api.jolpi.ca/ergast/f1`) | calendar, results, standings, champions | none | not published on the API landing page (**unverified**); self-limited to 120/min, burst 4, plus a 24 h cache |
 
 **Measured disagreement:** for 2026 OpenF1 lists 25 race sessions and Jolpica 23; the two Jolpica lacks
@@ -24,7 +24,11 @@ name ("Sakhir" vs "bahrain"), and the Track screen shows how many meetings the o
 Two Jolpica quirks, both measured: the cross-season filter `driverStandings/1.json` answers **400** — only
 `/{season}/driverStandings/1.json` works, so the champions wall costs one request per season — and the
 champions are cached for 24 hours rather than fetched per screen.
-| News feeds (10, see `NewsSources`) | headlines as links only, never article bodies | none | per-publisher; one browser-shaped User-Agent is required by Reddit |
+| OpenF1 image URLs (`drivers.headshot_url`, `meetings.circuit_image`, `meetings.country_flag`) | driver portraits, track-layout icons, country flags — served from `media.formula1.com` | none (the URLs ship in the OpenF1 payloads) | same OpenF1 budget; the media host itself answered 200 to every probe with no key |
+| News feeds (9, see `NewsFeedReader.All`) | headlines as links only, never article bodies | none | per-publisher; some publishers 403 a non-browser agent |
+
+**r/formula1 removed 2026-11-22, measured:** Reddit answers `404` for `/r/formula1/.rss`, `429` for
+`/r/formula1.rss` and a `302` for `old.reddit.com` to anonymous clients — a feed behind a login is not a candidate.
 
 Feeds verified one by one before being added; `f1technical.net`, `planetf1.com`, `gpblog.com`,
 `crash.net` `/rss/news` and the Megaphone/Acast podcast URLs returned 404 and were left out. The
@@ -32,6 +36,15 @@ Feeds verified one by one before being added; `f1technical.net`, `planetf1.com`,
 for the audio/video affordance instead.
 
 Rate limits were read from the providers' own docs; re-verify before relying on the numbers.
+
+## Images: two sources, one of them not open
+
+Wikimedia Commons images are CC-licensed and carry author + licence in the UI, as the licence requires
+(`docs/adr.md` ADR-010). The images OpenF1 returns in its payloads are **Formula 1's own artwork**, hosted on
+`media.formula1.com`: they need no key, but they are not freely licensed. They are used here as the
+provider publishes them - never copied, cropped or redistributed - with an on-screen credit
+("Portrait: Formula 1 media, via OpenF1", "track icon and flag: Formula 1 media, via OpenF1"). Commons remains
+the fallback for any driver the provider omits, so the app still has a freely licensed path for every subject.
 
 ## The one non-open source, and why it is off
 

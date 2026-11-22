@@ -28,13 +28,6 @@ public sealed record SessionRequest(int SessionKey, string Label, DateTimeOffset
 /// </remarks>
 public sealed class SessionRunner : IAsyncDisposable
 {
-    /// <summary>Session replayed before the user picks one: Bahrain 2024, ten minutes into the race.</summary>
-    public static readonly SessionRequest Default = new(
-        SessionKey: 9472,
-        Label: "Bahrain 2024 · Race",
-        From: new DateTimeOffset(2024, 3, 2, 15, 29, 0, TimeSpan.Zero),
-        CircuitId: "sakhir");
-
     /// <summary>Car used to trace the circuit outline: any car that completed a lap works.</summary>
     public const int DefaultOutlineDriver = 44;
 
@@ -178,10 +171,18 @@ public sealed class SessionRunner : IAsyncDisposable
     {
         try
         {
-            // No pick yet: resolve the current weekend's latest finished session, else the recorded fallback.
+            // No pick yet: resolve the current weekend's latest finished session. There is no hardcoded
+            // fallback: if nothing resolves, the replay does not start and the screens say so, rather than
+            // presenting a two-year-old session as if it were current.
             var request = _request
-                          ?? await _resolver.ResolveAsync(cancellationToken).ConfigureAwait(false)
-                          ?? Default;
+                          ?? await _resolver.ResolveAsync(cancellationToken).ConfigureAwait(false);
+
+            if (request is null)
+            {
+                FailureReason = "no finished session available to replay";
+                SessionLabel = "no session";
+                return;
+            }
 
             _request = request;
             SessionLabel = request.Label;

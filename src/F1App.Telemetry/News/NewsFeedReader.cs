@@ -33,6 +33,10 @@ public sealed record NewsSource(string Name, string Url, NewsKind Kind);
 public static class NewsSources
 {
     /// <summary>Every configured feed.</summary>
+    /// <remarks>
+    /// r/formula1 was removed on 2026-11-22: Reddit now answers 404 for <c>/.rss</c>, 429 for <c>.rss</c> and a
+    /// 302 for the old host, to anonymous clients. A source that needs a key or a login is not a candidate.
+    /// </remarks>
     public static readonly ImmutableArray<NewsSource> All =
     [
         new("Formula 1", "https://www.formula1.com/en/latest/all.xml", NewsKind.Article),
@@ -43,7 +47,6 @@ public static class NewsSources
         new("BBC Sport", "https://feeds.bbci.co.uk/sport/formula1/rss.xml", NewsKind.Article),
         new("Crash.net", "https://www.crash.net/rss/f1", NewsKind.Article),
         new("Motorsport Week", "https://www.motorsportweek.com/feed/", NewsKind.Article),
-        new("r/formula1", "https://www.reddit.com/r/formula1/.rss", NewsKind.Article),
         new("F1 on YouTube", "https://www.youtube.com/feeds/videos.xml?channel_id=UCB_qr75-ydFVKSF9Dmo6izg", NewsKind.Video),
     ];
 }

@@ -216,3 +216,105 @@ task exception), a font probe erroring on every label, and the two DI failures i
 
 **Consequences.** The app writes to disk on the user's device; the log holds no personal data, only provider
 status, counts and stack traces.
+
+## ADR-013 — The archive is one request per season, persisted per season, and its records are computed
+
+**Status:** accepted
+
+**Context.** "All seasons, all races" reads as thousands of requests: Jolpica's per-race results endpoints
+would cost ~7 400 requests for 1950→today. The user asked for the full archive on keyless sources, and
+Jolpica self-budgets to bursts of four.
+
+**Decision.** The vault syncs with one request per season: `/{season}/results/1.json` answers with the whole
+season's races and their first-place results (measured against the live endpoint for 1950, 2023 and 2026).
+Rows are written per season into `race_vault`, so an interrupted sync resumes at the first missing season
+instead of starting over; past seasons are fetched once, the current season refreshes when a day old. The
+record book (all-time wins by driver and constructor) is computed from the cached rows, never fetched.
+
+**Evidence.** First live sync filled 989 races (1950-2020) before the process was stopped; the second run
+added only the missing seasons, ending at 1,147 races across 76 seasons with the all-time win counts matching
+the published record (Hamilton 106, Schumacher 91; Ferrari 246). Unit tests pin the same behaviour: parse
+shape, per-season resume, failure reporting, and record computation.
+
+**Correction (same day).** The Indianapolis 500 is championship-scoring 1950-1960 and Jolpica lists it among
+each season's races; it is not a Grand Prix, so the vault now drops it at parse time (`circuitId ==
+"indianapolis"` **and** season <= 1960, because the 2000-2007 US GP shares that circuit id) and a v3 schema
+migration deletes the eleven rows an already-synced device holds. Measured after the migration: 11 rows
+removed, the 8 US GPs kept, 0 duplicates, 1 158 races across 77 seasons.
+
+**Consequences.** The first open of the Archive screen is the only one that pays for the network (~78
+requests under a minute at burst four); every later open reads SQLite. A season that fails is skipped and
+reported, not retried until the next open. "All details" per race (full classification, qualifying, pit
+stops) is *not* what this stores - one row per race carries the winner; anything else stays on the Results
+and Strategy screens, which have per-session data OpenF1 only publishes from 2023.
+
+## ADR-014 — Platform navigation per idiom: bottom tabs on phones, flyout on desktop
+
+**Status:** accepted
+
+**Context.** Every screen was a `FlyoutItem` group holding one `Tab`, which on a phone is a hamburger menu -
+a pattern iOS and Android users read as a web app, not a native one. The prototype that set the visual target
+has five primary tabs.
+
+**Decision.** `DeviceInfo.Idiom == Phone` selects a `TabBar` with five destinations (Season, Pit wall, Archive,
+Paddock, More); the remaining nine screens are `Routing.RegisterRoute` entries pushed from `MorePage`, which is
+generated from one table (`AppShell.Secondary`). Desktop and Mac keep the flyout, which is the desktop idiom for
+a dozen screens. Routed pages are created by `ServicesRouteFactory` from the container, because the default
+`Activator` path requires a parameterless constructor and every page takes its view model from DI.
+
+**Evidence.** `F1APP_PHONE=1` forces the phone shell inside a desktop build, so the walk exercises it: 5 tabs and
+9 pushed routes, 23 navigations, zero page failures. The desktop walk covers its 13 destinations, also clean.
+The first attempt pushed `more/{route}` and every route failed with "Relative routing to shell elements is not
+currently supported" - a registered route is pushed by its plain name, which the walk then verified.
+
+**Consequences.** Two navigation wirings to keep, but one page set, one route table and one walk. A screen added
+to `Secondary` appears in the More list automatically; a screen added as a tab needs a deliberate decision, which
+is the point. The phone shell has not been seen on a phone - the forced-shell walk proves wiring, not appearance.
+
+## ADR-015 — Teammate duels come from paged season classifications, counted only where both cars were classified
+
+**Status:** accepted
+
+**Context.** "Teammate head-to-head" is the first Paddock stat that is not a photo or a roster row, and it needs
+every race of a season at driver level. Measured: `/{season}/results.json` returns 479 rows for 2024, and
+Jolpica clamps `limit` to 100 (asking 500 or 1000 still answers 100), so a season is five paged requests.
+`/{season}/results/1.json` - the archive's endpoint - carries only the winner, so it cannot answer this.
+
+**Decision.** A `JolpicaSeasonResultsClient` pages the season and the rows land in `season_results` with a
+24-hour TTL; `TeammateDuelService` computes duels from those rows. A pair is only compared when both cars of
+one constructor finished with a numeric position, and the result is emitted both ways round so either driver can
+be shown. Average position delta is a double division from the driver's own point of view (positive = ahead).
+
+**Evidence.** Live run: 440 classifications cached for 2026. The computed numbers are symmetric and plausible -
+Verstappen 16-4 over Hadjar with +1.7 places and 15-5 on grid; Norris 12-8 over Piastri; Hamilton/Leclerc 10-10
+with deltas of exactly opposite sign. Two of these tests failed first and found real defects: integer division
+reported every fractional average as 0, and the duel was keyed on a driver id that no open-f1 driver code
+matches (both fixed).
+
+**Consequences.** Five requests per season, once a day - far inside the self-imposed budget. A season whose page
+fails is reported as unavailable rather than counted over the pages that succeeded: half a season would be a
+wrong number, not a smaller one. Qualifying comparison uses the grid, which is the only qualifying data in the
+classifications payload; real Q1/Q2/Q3 gaps would need the qualifying endpoint at one request per race.
+
+## ADR-016 — Provider-supplied images come first, with the licence stated on screen
+
+**Status:** accepted
+
+**Context.** The OpenF1 payloads carry image URLs the app was ignoring: `drivers.headshot_url` (21 of 22 drivers
+in the 2026 Las Vegas session), `meetings.circuit_image` and `meetings.country_flag`. Until now the Paddock
+searched Commons for a portrait and the Track had no circuit artwork at all. Those URLs are Formula 1 media,
+which is not an open licence - unlike every other source in this project.
+
+**Decision.** The provider's headshot is shown first and labelled "Portrait: Formula 1 media, via OpenF1";
+Commons stays the fallback and keeps its author-and-licence caption. The Track header shows the country flag
+and the official track-layout icon from `meetings` (one extra request per season, best effort), credited
+"track icon and flag: Formula 1 media, via OpenF1". The Commons aerial photograph stays on the same screen
+with its full CC attribution.
+
+**Evidence.** All three URL classes answered `200 image/png` with no key: headshot 93x93 (11 KB), circuit icon
+960x720 (17 KB), flag 1000x563 (2.4 KB). `meetings?year=2026` returned 27 meetings, all with a circuit image.
+The catalogue's extra request is one per season and is ignored when it fails, so a picture never blocks a map.
+
+**Consequences.** Images are displayed as the provider serves them - never copied, cropped or bundled - and
+every screen that shows them says whose they are. This is the one place where "open APIs" does not mean "open
+licence", and AGENTS.md records that explicitly rather than letting the rule quietly mean less.

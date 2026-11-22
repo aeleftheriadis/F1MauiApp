@@ -37,14 +37,11 @@ public sealed class FactsPage : ContentPage
             Header = BuildColumnHeader(),
         };
 
-        var status = new Label
-        {
-            FontSize = Tokens.FontCaption,
-            FontFamily = Tokens.MonoFont,
-            TextColor = Themes.Current.TextSecondary,
-            Padding = new Thickness(Tokens.Space4, Tokens.Space2),
-        };
-        status.SetBinding(Label.TextProperty, nameof(FactsViewModel.Status));
+        var status = Surfaces.StatusBar(_viewModel, nameof(FactsViewModel.Status), nameof(FactsViewModel.IsBusy));
+
+        var refresh = new RefreshView { Content = list };
+        refresh.SetBinding(RefreshView.IsRefreshingProperty, nameof(FactsViewModel.IsBusy), mode: BindingMode.OneWay);
+        refresh.Command = new Command(async () => await LoadAsync(force: true));
 
         var layout = new Grid
         {
@@ -56,7 +53,7 @@ public sealed class FactsPage : ContentPage
             BackgroundColor = Themes.Current.Background,
         };
 
-        layout.Add(list, 0, 0);
+        layout.Add(refresh, 0, 0);
         layout.Add(status, 0, 1);
 
         return layout;
@@ -152,6 +149,6 @@ public sealed class FactsPage : ContentPage
         row.Add(text, 1);
         row.Add(numbers, 2);
 
-        return Surfaces.Card(row, new Thickness(Tokens.Space3, Tokens.Space1));
+        return Surfaces.Row(row, Thickness.Zero);
     }
 }

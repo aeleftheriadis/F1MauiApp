@@ -90,11 +90,7 @@ public sealed class WeekendPage : ContentPage
                     FontFamily = Tokens.MonoFont,
                     TextColor = Themes.Current.LiveText,
                 }, Label.TextProperty, nameof(WeekendViewModel.Countdown)),
-                Bind(new Label
-                {
-                    FontSize = Tokens.FontBody,
-                    TextColor = Themes.Current.TextSecondary,
-                }, Label.TextProperty, nameof(WeekendViewModel.Status)),
+                Surfaces.StatusBar(_viewModel, nameof(WeekendViewModel.Status), nameof(WeekendViewModel.IsBusy)),
             },
         };
 

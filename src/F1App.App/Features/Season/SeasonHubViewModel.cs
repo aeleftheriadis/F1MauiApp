@@ -2,10 +2,15 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using F1App.Domain;
+using F1App.Services;
+using F1App.Telemetry.Circuits;
 
 namespace F1App.Features.Season;
 
-/// <summary>One round on the season list.</summary>
+/// <summary>
+/// One round on the season list. <c>SessionKey</c> is the OpenF1 session that can be replayed, or 0 when
+/// none is published yet; <c>CircuitId</c> lets the map tell whether it belongs to the replay.
+/// </summary>
 public sealed record SeasonRound(
     string Round,
     string Name,
@@ -13,7 +18,14 @@ public sealed record SeasonRound(
     string When,
     string State,
     bool IsNext,
-    bool IsDone);
+    bool IsDone,
+    int SessionKey,
+    string CircuitId,
+    DateTimeOffset RaceStart)
+{
+    /// <summary>True when this round has published telemetry to replay.</summary>
+    public bool CanReplay => SessionKey != 0;
+}
 
 /// <summary>
 /// The season hub: every round of a season in local time, with the next race called out.
@@ -25,19 +37,31 @@ public sealed record SeasonRound(
 public sealed partial class SeasonHubViewModel : ObservableObject
 {
     private readonly IRaceCalendarStore _calendar;
+    private readonly OpenF1CircuitCatalogue _catalogue;
+    private readonly SessionRunner _runner;
     private readonly TimeProvider _timeProvider;
 
-    public SeasonHubViewModel(IRaceCalendarStore calendar, TimeProvider timeProvider)
+    public SeasonHubViewModel(
+        IRaceCalendarStore calendar,
+        OpenF1CircuitCatalogue catalogue,
+        SessionRunner runner,
+        TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(calendar);
+        ArgumentNullException.ThrowIfNull(catalogue);
+        ArgumentNullException.ThrowIfNull(runner);
         ArgumentNullException.ThrowIfNull(timeProvider);
 
         _calendar = calendar;
+        _catalogue = catalogue;
+        _runner = runner;
         _timeProvider = timeProvider;
 
         var year = timeProvider.GetUtcNow().Year;
-        Years = new List<int> { year - 1, year, year + 1 };
-        YearIndex = 1;
+        // OpenF1 publishes sessions from 2023 onwards; a year outside that range has no calendar and
+        // nothing to replay, so the picker starts there rather than at 1950.
+        Years = Enumerable.Range(2023, year + 1 - 2023 + 1).ToList();
+        YearIndex = Years.IndexOf(year);
         Headline = "season";
         Subhead = "loading calendar";
         HeroTitle = "—";
@@ -94,7 +118,9 @@ public sealed partial class SeasonHubViewModel : ObservableObject
         switch (loaded)
         {
             case System.Collections.Immutable.ImmutableArray<RaceWeekend> races:
-                Build(races);
+                // The calendar decides the rounds; OpenF1 decides which of them have telemetry to replay.
+                var sessions = await _catalogue.LoadSeasonAsync(year, cancellationToken).ConfigureAwait(true);
+                Build(races, sessions is System.Collections.Immutable.ImmutableArray<CircuitEntry> entries ? entries : []);
                 break;
 
             case HttpFailure failure:
@@ -115,10 +141,45 @@ public sealed partial class SeasonHubViewModel : ObservableObject
         IsBusy = false;
     }
 
-    private void Build(System.Collections.Immutable.ImmutableArray<RaceWeekend> races)
+    /// <summary>Switches the app's replay to this round's race session, the same path Results uses.</summary>
+    public async Task ReplayAsync(SeasonRound round, CancellationToken cancellationToken)
+    {
+        if (!round.CanReplay)
+        {
+            Status = $"{round.Name} has no published telemetry to replay";
+            return;
+        }
+
+        var year = Years[YearIndex];
+        Status = $"switching replay to {round.Name} {year}";
+        await _runner
+            .SwitchToAsync(
+                new SessionRequest(
+                    round.SessionKey,
+                    $"{round.Name} {year} · Race",
+                    // Ten minutes in, the same offset Results uses: past the start and into running order.
+                    round.RaceStart.AddMinutes(10),
+                    round.CircuitId),
+                cancellationToken)
+            .ConfigureAwait(true);
+
+        Status = $"replaying {round.Name} {year}; the Timing and Track screens now follow this session";
+    }
+
+    private void Build(
+        System.Collections.Immutable.ImmutableArray<RaceWeekend> races,
+        System.Collections.Immutable.ImmutableArray<CircuitEntry> sessions)
     {
         var now = _timeProvider.GetUtcNow();
         Rounds.Clear();
+
+        // Join on the race date: the two sources do not share circuit identifiers (ADR-004 in calendar terms).
+        var byDate = new Dictionary<DateOnly, CircuitEntry>();
+
+        foreach (var entry in sessions)
+        {
+            byDate.TryAdd(DateOnly.FromDateTime(entry.RaceStart.UtcDateTime), entry);
+        }
 
         var next = races.FirstOrDefault(race => race.RaceStart > now);
         var completed = races.Count(race => race.RaceStart <= now);
@@ -136,7 +197,12 @@ public sealed partial class SeasonHubViewModel : ObservableObject
                 When: race.RaceStart.ToLocalTime().ToString("ddd dd MMM · HH:mm", CultureInfo.CurrentCulture),
                 State: isNext ? "NEXT" : isDone ? "DONE" : $"IN {(int)(race.RaceStart - now).TotalDays}d",
                 IsNext: isNext,
-                IsDone: isDone));
+                IsDone: isDone,
+                SessionKey: byDate.TryGetValue(DateOnly.FromDateTime(race.RaceStart.UtcDateTime), out var session)
+                    ? session.RaceSessionKey
+                    : 0,
+                CircuitId: race.Circuit.Id,
+                RaceStart: race.RaceStart));
         }
 
         Subhead = string.Create(

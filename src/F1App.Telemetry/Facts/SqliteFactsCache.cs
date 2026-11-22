@@ -15,7 +15,7 @@ namespace F1App.Telemetry.Facts;
 /// </remarks>
 public sealed class SqliteFactsCache
 {
-    private const int SchemaVersion = 1;
+    private const int SchemaVersion = 4;
 
     private readonly string _connectionString;
 
@@ -212,6 +212,264 @@ public sealed class SqliteFactsCache
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>Every archived race in the vault, oldest first.</summary>
+    public async Task<ImmutableArray<ArchivedRace>> ReadRacesAsync(CancellationToken cancellationToken)
+    {
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureSchemaAsync(connection, cancellationToken).ConfigureAwait(false);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT season, round, race_name, circuit_id, circuit_name, country, date, winner, constructor, laps, winning_time
+            FROM race_vault
+            ORDER BY season, round
+            """;
+
+        var builder = ImmutableArray.CreateBuilder<ArchivedRace>(1200);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            builder.Add(new ArchivedRace(
+                reader.GetInt32(0),
+                reader.GetInt32(1),
+                reader.GetString(2),
+                reader.GetString(3),
+                reader.GetString(4),
+                reader.GetString(5),
+                DateOnly.Parse(reader.GetString(6), CultureInfo.InvariantCulture),
+                reader.GetString(7),
+                reader.GetString(8),
+                reader.GetInt32(9),
+                reader.GetString(10)));
+        }
+
+        return builder.ToImmutable();
+    }
+
+    /// <summary>Every season held in the vault, with when its rows were fetched.</summary>
+    public async Task<ImmutableArray<(int Season, DateTimeOffset FetchedAt)>> ReadSeasonsAsync(
+        CancellationToken cancellationToken)
+    {
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureSchemaAsync(connection, cancellationToken).ConfigureAwait(false);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT season, MAX(fetched_at)
+            FROM race_vault
+            GROUP BY season
+            ORDER BY season
+            """;
+
+        var builder = ImmutableArray.CreateBuilder<(int, DateTimeOffset)>(80);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            builder.Add((
+                reader.GetInt32(0),
+                DateTimeOffset.Parse(reader.GetString(1), CultureInfo.InvariantCulture)));
+        }
+
+        return builder.ToImmutable();
+    }
+
+    /// <summary>Replaces the archived races of one season. An empty list clears the season.</summary>
+    public async Task WriteRacesAsync(
+        int season,
+        ImmutableArray<ArchivedRace> races,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureSchemaAsync(connection, cancellationToken).ConfigureAwait(false);
+
+        await using var transaction = (SqliteTransaction)await connection
+            .BeginTransactionAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        await using var clear = connection.CreateCommand();
+        clear.Transaction = transaction;
+        clear.CommandText = "DELETE FROM race_vault WHERE season = $season";
+        clear.Parameters.AddWithValue("$season", season);
+        await clear.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+
+        await using var insert = connection.CreateCommand();
+        insert.Transaction = transaction;
+        insert.CommandText =
+            """
+            INSERT INTO race_vault (
+                season, round, race_name, circuit_id, circuit_name, country,
+                date, winner, constructor, laps, winning_time, fetched_at)
+            VALUES (
+                $season, $round, $raceName, $circuitId, $circuitName, $country,
+                $date, $winner, $constructor, $laps, $winningTime, $fetchedAt)
+            """;
+
+        var round = insert.Parameters.Add("$round", SqliteType.Integer);
+        var raceName = insert.Parameters.Add("$raceName", SqliteType.Text);
+        var circuitId = insert.Parameters.Add("$circuitId", SqliteType.Text);
+        var circuitName = insert.Parameters.Add("$circuitName", SqliteType.Text);
+        var country = insert.Parameters.Add("$country", SqliteType.Text);
+        var date = insert.Parameters.Add("$date", SqliteType.Text);
+        var winner = insert.Parameters.Add("$winner", SqliteType.Text);
+        var constructor = insert.Parameters.Add("$constructor", SqliteType.Text);
+        var laps = insert.Parameters.Add("$laps", SqliteType.Integer);
+        var winningTime = insert.Parameters.Add("$winningTime", SqliteType.Text);
+        var fetchedAt = insert.Parameters.Add("$fetchedAt", SqliteType.Text);
+
+        insert.Parameters.AddWithValue("$season", season);
+        fetchedAt.Value = now.ToString("O", CultureInfo.InvariantCulture);
+
+        foreach (var race in races)
+        {
+            round.Value = race.Round;
+            raceName.Value = race.RaceName;
+            circuitId.Value = race.CircuitId;
+            circuitName.Value = race.CircuitName;
+            country.Value = race.Country;
+            date.Value = race.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            winner.Value = race.Winner;
+            constructor.Value = race.Constructor;
+            laps.Value = race.Laps;
+            winningTime.Value = race.WinningTime;
+
+            await insert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Every cached classification row of one season.</summary>
+    public async Task<ImmutableArray<RaceResultRow>> ReadSeasonResultsAsync(
+        int season,
+        CancellationToken cancellationToken)
+    {
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureSchemaAsync(connection, cancellationToken).ConfigureAwait(false);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT season, round, driver_id, driver_code, driver_name, constructor_id,
+                   position, position_text, grid, status
+            FROM season_results
+            WHERE season = $season
+            ORDER BY round, position
+            """;
+        command.Parameters.AddWithValue("$season", season);
+
+        var builder = ImmutableArray.CreateBuilder<RaceResultRow>(512);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            builder.Add(new RaceResultRow(
+                reader.GetInt32(0),
+                reader.GetInt32(1),
+                reader.GetString(2),
+                reader.GetString(3),
+                reader.GetString(4),
+                reader.GetString(5),
+                reader.IsDBNull(6) ? null : reader.GetInt32(6),
+                reader.GetString(7),
+                reader.IsDBNull(8) ? null : reader.GetInt32(8),
+                reader.GetString(9)));
+        }
+
+        return builder.ToImmutable();
+    }
+
+    /// <summary>When one season's classifications were last written, or <see langword="null"/> when never.</summary>
+    public async Task<DateTimeOffset?> ReadSeasonResultsFetchedAtAsync(
+        int season,
+        CancellationToken cancellationToken)
+    {
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureSchemaAsync(connection, cancellationToken).ConfigureAwait(false);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT MAX(fetched_at) FROM season_results WHERE season = $season";
+        command.Parameters.AddWithValue("$season", season);
+
+        var value = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+
+        return value is string text && DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, out var parsed)
+            ? parsed
+            : null;
+    }
+
+    /// <summary>Replaces one season's classifications.</summary>
+    public async Task WriteSeasonResultsAsync(
+        int season,
+        ImmutableArray<RaceResultRow> rows,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureSchemaAsync(connection, cancellationToken).ConfigureAwait(false);
+
+        await using var transaction = (SqliteTransaction)await connection
+            .BeginTransactionAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        await using var clear = connection.CreateCommand();
+        clear.Transaction = transaction;
+        clear.CommandText = "DELETE FROM season_results WHERE season = $season";
+        clear.Parameters.AddWithValue("$season", season);
+        await clear.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+
+        await using var insert = connection.CreateCommand();
+        insert.Transaction = transaction;
+        insert.CommandText =
+            """
+            INSERT INTO season_results (
+                season, round, driver_id, driver_code, driver_name, constructor_id,
+                position, position_text, grid, status, fetched_at)
+            VALUES (
+                $season, $round, $driverId, $driverCode, $driverName, $constructorId,
+                $position, $positionText, $grid, $status, $fetchedAt)
+            """;
+
+        var round = insert.Parameters.Add("$round", SqliteType.Integer);
+        var driverId = insert.Parameters.Add("$driverId", SqliteType.Text);
+        var driverCode = insert.Parameters.Add("$driverCode", SqliteType.Text);
+        var driverName = insert.Parameters.Add("$driverName", SqliteType.Text);
+        var constructorId = insert.Parameters.Add("$constructorId", SqliteType.Text);
+        var position = insert.Parameters.Add("$position", SqliteType.Integer);
+        var positionText = insert.Parameters.Add("$positionText", SqliteType.Text);
+        var grid = insert.Parameters.Add("$grid", SqliteType.Integer);
+        var status = insert.Parameters.Add("$status", SqliteType.Text);
+        insert.Parameters.AddWithValue("$season", season);
+        insert.Parameters.AddWithValue("$fetchedAt", now.ToString("O", CultureInfo.InvariantCulture));
+
+        foreach (var row in rows)
+        {
+            round.Value = row.Round;
+            driverId.Value = row.DriverId;
+            driverCode.Value = row.DriverCode;
+            driverName.Value = row.DriverName;
+            constructorId.Value = row.ConstructorId;
+            position.Value = (object?)row.Position ?? DBNull.Value;
+            positionText.Value = row.PositionText;
+            grid.Value = (object?)row.Grid ?? DBNull.Value;
+            status.Value = row.Status;
+
+            await insert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     private static async Task EnsureSchemaAsync(SqliteConnection connection, CancellationToken cancellationToken)
     {
         await using var command = connection.CreateCommand();
@@ -233,9 +491,63 @@ public sealed class SqliteFactsCache
                  fetched_at  TEXT    NOT NULL,
                  PRIMARY KEY (circuit_id, driver)
              );
-             PRAGMA user_version = {SchemaVersion};
+             CREATE TABLE IF NOT EXISTS race_vault (
+                 season       INTEGER NOT NULL,
+                 round        INTEGER NOT NULL,
+                 race_name    TEXT    NOT NULL,
+                 circuit_id   TEXT    NOT NULL,
+                 circuit_name TEXT    NOT NULL,
+                 country      TEXT    NOT NULL,
+                 date         TEXT    NOT NULL,
+                 winner       TEXT    NOT NULL,
+                 constructor  TEXT    NOT NULL,
+                 laps         INTEGER NOT NULL,
+                 winning_time TEXT    NOT NULL,
+                 fetched_at   TEXT    NOT NULL,
+                 PRIMARY KEY (season, round)
+             );
+             CREATE TABLE IF NOT EXISTS season_results (
+                 season        INTEGER NOT NULL,
+                 round         INTEGER NOT NULL,
+                 driver_id     TEXT    NOT NULL,
+                 driver_code   TEXT    NOT NULL,
+                 driver_name   TEXT    NOT NULL,
+                 constructor_id TEXT   NOT NULL,
+                 position      INTEGER,
+                 position_text TEXT    NOT NULL,
+                 grid          INTEGER,
+                 status        TEXT    NOT NULL,
+                 fetched_at    TEXT    NOT NULL,
+                 PRIMARY KEY (season, round, driver_id)
+             );
              """;
 
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+
+        await MigrateAsync(connection, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Applies data corrections and stamps the version. Runs once per database.</summary>
+    private static async Task MigrateAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await using var version = connection.CreateCommand();
+        version.CommandText = "PRAGMA user_version";
+        var current = Convert.ToInt32(
+            await version.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false),
+            CultureInfo.InvariantCulture);
+
+        if (current >= SchemaVersion)
+        {
+            return;
+        }
+
+        // v3: the Indianapolis 500 was championship-scoring until 1960 but is not a Grand Prix.
+        await using var purge = connection.CreateCommand();
+        purge.CommandText = "DELETE FROM race_vault WHERE circuit_id = 'indianapolis' AND season <= 1960";
+        await purge.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+
+        await using var stamp = connection.CreateCommand();
+        stamp.CommandText = $"PRAGMA user_version = {SchemaVersion}";
+        await stamp.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 }

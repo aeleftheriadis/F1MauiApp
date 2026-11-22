@@ -53,4 +53,5 @@ public sealed record OpenF1Driver(
     [property: JsonPropertyName("name_acronym")] string? Acronym,
     [property: JsonPropertyName("full_name")] string? FullName,
     [property: JsonPropertyName("team_name")] string? TeamName,
-    [property: JsonPropertyName("team_colour")] string? TeamColour);
+    [property: JsonPropertyName("team_colour")] string? TeamColour,
+    [property: JsonPropertyName("headshot_url")] string? HeadshotUrl);

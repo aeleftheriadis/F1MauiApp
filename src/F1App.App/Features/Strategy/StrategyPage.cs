@@ -56,12 +56,7 @@ public sealed class StrategyPage : ContentPage
                     TextColor = Themes.Current.TextPrimary,
                 }, Label.TextProperty, nameof(StrategyViewModel.Headline)),
                 _picker,
-                Bind(new Label
-                {
-                    FontSize = Tokens.FontCaption,
-                    FontFamily = Tokens.MonoFont,
-                    TextColor = Themes.Current.TextSecondary,
-                }, Label.TextProperty, nameof(StrategyViewModel.Status)),
+                Surfaces.StatusBar(_viewModel, nameof(StrategyViewModel.Status), nameof(StrategyViewModel.IsBusy)),
             },
         };
 

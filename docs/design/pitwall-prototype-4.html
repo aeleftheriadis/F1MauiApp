@@ -1,0 +1,1657 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>F1 Pit-Wall Live Telemetry & Paddock Companion</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            carbon: '#0B0D12',
+            slatepanel: '#141821',
+            slatecard: '#1B202C',
+            f1red: '#E10600',
+            f1purple: '#A855F7',
+            f1green: '#22C55E',
+            f1yellow: '#EAB308',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      background-color: #050608;
+      color: #F3F4F6;
+      font-family: 'Inter', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 0;
+    }
+    ::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0B0D12;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #2A3142;
+      border-radius: 4px;
+    }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    @keyframes pulse-live {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+    .animate-live-dot {
+      animation: pulse-live 1.5s infinite ease-in-out;
+    }
+    @keyframes eq-bar {
+      0%, 100% { height: 25%; }
+      50% { height: 95%; }
+    }
+    .eq-active .bar-1 { animation: eq-bar 0.45s infinite ease-in-out; }
+    .eq-active .bar-2 { animation: eq-bar 0.35s infinite ease-in-out 0.1s; }
+    .eq-active .bar-3 { animation: eq-bar 0.55s infinite ease-in-out 0.2s; }
+    .eq-active .bar-4 { animation: eq-bar 0.40s infinite ease-in-out 0.15s; }
+    .eq-active .bar-5 { animation: eq-bar 0.50s infinite ease-in-out 0.05s; }
+  </style>
+</head>
+<body>
+
+  <!-- Mobile App Container -->
+  <div id="app-shell" class="relative w-full max-w-[440px] h-[100dvh] sm:h-[880px] sm:rounded-[38px] sm:border-[6px] sm:border-[#1E2330] bg-carbon flex flex-col overflow-hidden shadow-2xl">
+
+    <!-- Top Pit-Wall Telemetry Status Bar -->
+    <header class="bg-slatepanel border-b border-white/10 px-3.5 pt-2.5 pb-2 shrink-0 z-20">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="bg-f1red text-white font-black italic text-xs px-1.5 py-0.5 rounded tracking-tighter">F1</div>
+          <div>
+            <div class="flex items-center gap-1.5">
+              <span id="header-session-title" class="text-xs font-extrabold tracking-wide uppercase text-white">R21 • LAS VEGAS GP</span>
+              <span id="header-live-badge" class="flex items-center gap-1 bg-f1red/20 border border-f1red/40 text-f1red text-[9px] font-mono font-bold px-1.5 py-0.2 rounded">
+                <span class="w-1.5 h-1.5 rounded-full bg-f1red animate-live-dot"></span> LIVE
+              </span>
+            </div>
+            <p id="header-sub-info" class="text-[10px] font-mono text-gray-400">LAP <span id="header-lap-num">38</span>/50 • TRACK 21°C • AIR 16°C • DRS ENABLED</p>
+          </div>
+        </div>
+
+        <!-- Replay Speed Controller -->
+        <button id="replay-speed-btn" onclick="cycleReplaySpeed()" class="bg-slatecard hover:bg-white/10 border border-white/15 rounded-lg px-2.5 py-1 text-right transition active:scale-95">
+          <div class="text-[9px] text-gray-400 font-semibold uppercase leading-none">REPLAY</div>
+          <div id="replay-speed-label" class="text-xs font-mono font-extrabold text-f1green leading-tight">1x</div>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Scrollable Viewport -->
+    <main id="main-viewport" class="flex-1 overflow-y-auto overflow-x-hidden relative bg-carbon pb-20">
+
+      <!-- ========================================================= -->
+      <!-- TAB 1: SEASON HUB & MULTI-YEAR CALENDAR (DEFAULT LANDING) -->
+      <!-- ========================================================= -->
+      <section id="view-season" class="p-3.5 space-y-4">
+        <!-- Year Selector Pills -->
+        <div class="flex items-center justify-between bg-slatepanel p-1 rounded-xl border border-white/10">
+          <button onclick="selectSeasonYear(2025)" id="year-btn-2025" class="year-pill flex-1 py-1.5 rounded-lg text-xs font-mono font-bold text-gray-400 transition">2025 ARCHIVE</button>
+          <button onclick="selectSeasonYear(2026)" id="year-btn-2026" class="year-pill flex-1 py-1.5 rounded-lg text-xs font-mono font-bold bg-f1red text-white shadow transition">2026 ACTIVE</button>
+          <button onclick="selectSeasonYear(2027)" id="year-btn-2027" class="year-pill flex-1 py-1.5 rounded-lg text-xs font-mono font-bold text-gray-400 transition">2027 NEXT</button>
+        </div>
+
+        <!-- Hero Card: Next / Highlighted Race Weekend -->
+        <div id="season-hero-card" class="relative rounded-2xl overflow-hidden border border-white/15 bg-gradient-to-br from-[#1C2230] via-[#131722] to-[#0B0D12] p-4 shadow-lg">
+          <div class="flex justify-between items-start">
+            <div>
+              <span id="hero-badge" class="inline-block text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-f1red/20 text-f1red border border-f1red/30 mb-1.5">UPCOMING / LIVE WEEKEND • ROUND 21</span>
+              <h1 id="hero-gp-name" class="text-lg font-black tracking-tight text-white leading-tight">Las Vegas Grand Prix</h1>
+              <p id="hero-circuit-name" class="text-xs text-gray-400 font-medium">Las Vegas Strip Circuit • 6.201 km • 50 Laps</p>
+            </div>
+            <!-- Mini SVG Circuit Outline -->
+            <svg id="hero-track-svg" viewBox="0 0 120 70" class="w-24 h-14 stroke-f1red fill-none stroke-[2.5] opacity-90">
+              <path d="M15,52 L45,52 L52,38 L78,38 L85,20 L108,20 L108,45 L92,56 L15,56 Z" stroke-linejoin="round"/>
+            </svg>
+          </div>
+
+          <!-- Session Timetable (Local EET) -->
+          <div id="hero-sessions-grid" class="grid grid-cols-3 gap-1.5 mt-3 pt-3 border-t border-white/10 text-center font-mono">
+            <div class="bg-black/40 rounded-lg p-1.5 border border-white/5">
+              <div class="text-[9px] text-gray-400">QUALI (EET)</div>
+              <div class="text-[11px] font-bold text-white">SAT 08:00</div>
+            </div>
+            <div class="bg-black/40 rounded-lg p-1.5 border border-white/5">
+              <div class="text-[9px] text-gray-400">LIGHTS OUT</div>
+              <div class="text-[11px] font-bold text-f1green">SUN 08:00</div>
+            </div>
+            <div class="bg-black/40 rounded-lg p-1.5 border border-white/5">
+              <div class="text-[9px] text-gray-400">COMPOUNDS</div>
+              <div class="text-[11px] font-bold text-amber-400">C3 • C4 • C5</div>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="flex gap-2 mt-3">
+            <button onclick="launchPitWall('vegas')" class="flex-1 bg-f1red hover:bg-red-600 text-white font-bold text-xs py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 shadow-lg shadow-f1red/20 transition active:scale-98">
+              <span>⚡ LAUNCH PIT WALL TELEMETRY</span>
+            </button>
+            <button onclick="launchPitWall('interlagos')" class="bg-slatecard hover:bg-white/10 border border-white/15 text-gray-200 font-semibold text-xs py-2.5 px-3 rounded-xl transition active:scale-98" title="Jump to Previous Round">
+              ↺ R20 BRAZIL
+            </button>
+          </div>
+        </div>
+
+        <!-- Quick Previous Circuit Recap Banner -->
+        <div class="bg-slatepanel border border-white/10 rounded-xl p-3 flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-mono font-bold text-xs">R20</div>
+            <div>
+              <div class="text-xs font-bold text-white">Prev: São Paulo GP (Interlagos)</div>
+              <div class="text-[11px] text-gray-400 font-mono">1. VER  2. NOR (+1.8s)  3. LEC (+4.2s)</div>
+            </div>
+          </div>
+          <button onclick="launchPitWall('interlagos')" class="text-[11px] font-mono font-bold text-f1green bg-f1green/10 border border-f1green/30 px-2.5 py-1.5 rounded-lg">
+            REPLAY →
+          </button>
+        </div>
+
+        <!-- Full Season Calendar List -->
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <h2 id="calendar-list-heading" class="text-xs font-extrabold uppercase tracking-wider text-gray-300">2026 FIA Formula 1 World Championship</h2>
+            <span id="calendar-round-count" class="text-[10px] font-mono text-gray-400">24 ROUNDS</span>
+          </div>
+          <div id="season-calendar-list" class="space-y-2">
+            <!-- Populated dynamically by JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================= -->
+      <!-- TAB 2: PIT WALL LIVE TELEMETRY, TRACK MAP & TIMING TOWER  -->
+      <!-- ========================================================= -->
+      <section id="view-pitwall" class="hidden flex-col h-full">
+        <!-- Circuit Switcher & Sub-mode Bar -->
+        <div class="bg-slatepanel border-b border-white/10 px-3 py-2 flex items-center justify-between gap-2 sticky top-0 z-10">
+          <div class="flex bg-carbon p-0.5 rounded-lg border border-white/10 text-[11px] font-mono font-bold">
+            <button onclick="switchPitSubView('timing')" id="sub-btn-timing" class="pit-sub-btn px-2.5 py-1 rounded-md bg-f1red text-white">TIMING</button>
+            <button onclick="switchPitSubView('track')" id="sub-btn-track" class="pit-sub-btn px-2.5 py-1 rounded-md text-gray-400">TRACK MAP</button>
+            <button onclick="switchPitSubView('telemetry')" id="sub-btn-telemetry" class="pit-sub-btn px-2.5 py-1 rounded-md text-gray-400">H2H TELEM</button>
+          </div>
+
+          <!-- Quick Circuit Switcher -->
+          <select id="pitwall-circuit-select" onchange="launchPitWall(this.value)" class="bg-slatecard border border-white/15 text-[11px] font-mono font-bold text-white rounded-lg px-2 py-1 focus:outline-none">
+            <option value="vegas">R21: VEGAS (LIVE)</option>
+            <option value="interlagos">R20: INTERLAGOS</option>
+          </select>
+        </div>
+
+        <!-- Focused Driver Telemetry Strip -->
+        <div id="focused-driver-banner" class="bg-gradient-to-r from-[#1A202E] to-[#121620] border-b border-white/10 px-3.5 py-2 flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <div id="focus-team-bar" class="w-1.5 h-8 rounded-full bg-[#3671C6]"></div>
+            <div>
+              <div class="flex items-center gap-1.5">
+                <span id="focus-driver-code" class="text-sm font-black font-mono text-white">VER</span>
+                <span id="focus-driver-name" class="text-xs font-semibold text-gray-300">Max Verstappen</span>
+                <span id="focus-tyre-badge" class="text-[10px] font-mono font-extrabold px-1.5 rounded bg-yellow-500/20 text-yellow-400 border border-yellow-500/40">M • 14L</span>
+              </div>
+              <div id="focus-telemetry-readout" class="text-[10px] font-mono text-gray-400">338 KM/H • GEAR 8 • THR 100% • ERS 84%</div>
+            </div>
+          </div>
+          <button onclick="openDriverDossier(state.focusedDriverCode)" class="text-[10px] font-mono font-bold bg-white/10 hover:bg-white/15 text-white px-2 py-1 rounded-md">
+            DOSSIER ↗
+          </button>
+        </div>
+
+        <!-- SUB-VIEW A: 22-CAR LIVE TIMING TOWER -->
+        <div id="pit-sub-timing" class="p-2">
+          <div class="grid grid-cols-12 text-[9px] font-mono font-bold text-gray-400 px-2 py-1 border-b border-white/10">
+            <div class="col-span-1">POS</div>
+            <div class="col-span-4">DRIVER</div>
+            <div class="col-span-3 text-right">INTERVAL</div>
+            <div class="col-span-2 text-center">TYRE</div>
+            <div class="col-span-2 text-right">SECTORS</div>
+          </div>
+          <div id="timing-tower-rows" class="divide-y divide-white/5">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <!-- SUB-VIEW B: 60 FPS SKIASHARP-STYLE LIVE TRACK MAP -->
+        <div id="pit-sub-track" class="hidden p-3 space-y-3">
+          <div class="relative bg-slatepanel border border-white/10 rounded-2xl overflow-hidden">
+            <div class="absolute top-2.5 left-3 z-10 flex items-center gap-2">
+              <span class="text-[10px] font-mono font-bold bg-black/70 backdrop-blur px-2 py-0.5 rounded text-white border border-white/10">SKIA GPU CANVAS • 60 FPS</span>
+            </div>
+            <button onclick="toggleCameraFollow()" id="cam-follow-btn" class="absolute top-2.5 right-3 z-10 text-[10px] font-mono font-bold bg-f1red text-white px-2.5 py-1 rounded-lg shadow">
+              CAM: FULL TRACK
+            </button>
+            <canvas id="track-canvas" width="400" height="310" class="w-full h-[310px] block"></canvas>
+            <div class="bg-black/60 px-3 py-2 flex justify-between items-center text-[10px] font-mono text-gray-300 border-t border-white/10">
+              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-f1purple"></span> S1 RECORD</span>
+              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-f1green"></span> DRS ZONE 1 & 2</span>
+              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400"></span> PIT WINDOW</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUB-VIEW C: HEAD-TO-HEAD TELEMETRY COMPARISON -->
+        <div id="pit-sub-telemetry" class="hidden p-3 space-y-3">
+          <div class="bg-slatepanel border border-white/10 rounded-xl p-2.5 flex items-center justify-between gap-2">
+            <select id="h2h-driver-a" onchange="drawTelemetryCharts()" class="flex-1 bg-carbon border border-white/15 rounded-lg px-2 py-1.5 text-xs font-mono font-bold text-white">
+              <option value="VER">VER (Red Bull)</option>
+              <option value="NOR">NOR (McLaren)</option>
+              <option value="LEC">LEC (Ferrari)</option>
+              <option value="HAM">HAM (Ferrari)</option>
+            </select>
+            <span class="text-xs font-black text-f1red italic">VS</span>
+            <select id="h2h-driver-b" onchange="drawTelemetryCharts()" class="flex-1 bg-carbon border border-white/15 rounded-lg px-2 py-1.5 text-xs font-mono font-bold text-white">
+              <option value="NOR" selected>NOR (McLaren)</option>
+              <option value="VER">VER (Red Bull)</option>
+              <option value="LEC">LEC (Ferrari)</option>
+              <option value="ANT">ANT (Mercedes)</option>
+            </select>
+          </div>
+
+          <div class="bg-slatepanel border border-white/10 rounded-2xl p-3 space-y-2">
+            <div class="flex justify-between items-center text-[10px] font-mono">
+              <span class="text-gray-400">LAP TELEMETRY TRACE (DIST: <span id="scrub-dist-label" class="text-white font-bold">2,604m</span>)</span>
+              <span id="telemetry-delta-pill" class="text-f1green font-bold">DELTA: -0.142s</span>
+            </div>
+            <canvas id="telemetry-canvas" width="380" height="260" class="w-full h-[260px] block rounded-lg bg-carbon border border-white/5 touch-none cursor-ew-resize"></canvas>
+            <div class="grid grid-cols-3 gap-1.5 pt-1 text-center font-mono text-[10px]">
+              <div class="bg-carbon rounded-lg p-1.5 border border-white/5">
+                <div class="text-[9px] text-gray-400">SPEED (KM/H)</div>
+                <div id="scrub-speed-readout" class="font-bold text-white">334 vs 331</div>
+              </div>
+              <div class="bg-carbon rounded-lg p-1.5 border border-white/5">
+                <div class="text-[9px] text-gray-400">THROTTLE</div>
+                <div id="scrub-throttle-readout" class="font-bold text-f1green">100% vs 98%</div>
+              </div>
+              <div class="bg-carbon rounded-lg p-1.5 border border-white/5">
+                <div class="text-[9px] text-gray-400">BRAKE</div>
+                <div id="scrub-brake-readout" class="font-bold text-f1red">0% vs 0%</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================= -->
+      <!-- TAB 3: PADDOCK DOSSIERS (DRIVERS, CARS, HELMETS, CIRCUITS)-->
+      <!-- ========================================================= -->
+      <section id="view-paddock" class="hidden p-3.5 space-y-4">
+        <!-- Paddock Sub-Navigation -->
+        <div class="grid grid-cols-3 gap-1.5 bg-slatepanel p-1 rounded-xl border border-white/10 text-[11px] font-bold">
+          <button onclick="switchPaddockTab('drivers')" id="pad-tab-drivers" class="pad-tab-btn py-1.5 rounded-lg bg-f1red text-white">DRIVERS & HELMETS</button>
+          <button onclick="switchPaddockTab('cars')" id="pad-tab-cars" class="pad-tab-btn py-1.5 rounded-lg text-gray-400">2026 CARS & AERO</button>
+          <button onclick="switchPaddockTab('circuits')" id="pad-tab-circuits" class="pad-tab-btn py-1.5 rounded-lg text-gray-400">CIRCUIT VAULT</button>
+        </div>
+
+        <!-- PADDOCK SUB-VIEW 1: DRIVERS & HELMET GALLERY -->
+        <div id="paddock-drivers-list" class="space-y-2.5">
+          <!-- Populated dynamically with Driver Portraits, Helmet Designs & Stats -->
+        </div>
+
+        <!-- PADDOCK SUB-VIEW 2: 2026/2027 CHASSIS & LIVERY GALLERY -->
+        <div id="paddock-cars-list" class="hidden space-y-3">
+          <!-- Populated dynamically with High-Res Car Liveries & Tech Specs -->
+        </div>
+
+        <!-- PADDOCK SUB-VIEW 3: CIRCUIT & CORNER PHOTO VAULT -->
+        <div id="paddock-circuits-list" class="hidden space-y-3">
+          <!-- Populated dynamically with Circuit Corner Guides & Satellite Imagery -->
+        </div>
+      </section>
+
+      <!-- ========================================================= -->
+      <!-- TAB 4: HISTORICAL ARCHIVE & ALL-TIME F1 ENCYCLOPEDIA      -->
+      <!-- ========================================================= -->
+      <section id="view-archive" class="hidden p-3.5 space-y-3.5">
+        <!-- Archive Sub-Navigation Pills -->
+        <div class="flex gap-1.5 overflow-x-auto no-scrollbar bg-slatepanel p-1 rounded-xl border border-white/10 text-[10px] font-mono font-bold">
+          <button onclick="switchArchiveSubTab('races')" id="arch-tab-races" class="arch-tab-btn shrink-0 px-2.5 py-1.5 rounded-lg bg-f1red text-white">ALL RACES (1950-2026)</button>
+          <button onclick="switchArchiveSubTab('records')" id="arch-tab-records" class="arch-tab-btn shrink-0 px-2.5 py-1.5 rounded-lg text-gray-400">RECORDS & STATS</button>
+          <button onclick="switchArchiveSubTab('facts')" id="arch-tab-facts" class="arch-tab-btn shrink-0 px-2.5 py-1.5 rounded-lg text-gray-400">F1 FACTS & TRIVIA</button>
+          <button onclick="switchArchiveSubTab('worm')" id="arch-tab-worm" class="arch-tab-btn shrink-0 px-2.5 py-1.5 rounded-lg text-gray-400">LAP WORM REPLAY</button>
+        </div>
+
+        <!-- SUB-VIEW 1: ALL RACES (1950-2026) VAULT -->
+        <div id="archive-sub-races" class="space-y-3">
+          <div class="bg-slatepanel border border-white/10 rounded-2xl p-3 space-y-2.5">
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-xs font-black uppercase tracking-wider text-white">World Championship Grand Prix Vault</h2>
+                <p class="text-[10px] font-mono text-gray-400">SQLITE OFFLINE INDEX • 1950 SILVERSTONE TO 2026</p>
+              </div>
+              <span class="text-[10px] font-mono font-extrabold bg-f1green/15 border border-f1green/30 text-f1green px-2 py-0.5 rounded">1,168 RACES HELD</span>
+            </div>
+
+            <!-- Search Input -->
+            <div class="relative">
+              <input id="archive-race-search" oninput="renderAllRacesVault()" type="text" placeholder="Search GP, circuit, country or winner (e.g. Senna, Monza, 1950)..." class="w-full bg-carbon border border-white/15 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-f1red" />
+            </div>
+
+            <!-- Decade Filter Pills -->
+            <div id="archive-decade-pills" class="flex gap-1.5 overflow-x-auto no-scrollbar pb-0.5 text-[10px] font-mono font-bold">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <div id="archive-races-list" class="space-y-2">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <!-- SUB-VIEW 2: ALL-TIME RECORDS & STATISTICS -->
+        <div id="archive-sub-records" class="hidden space-y-3">
+          <div class="bg-slatepanel border border-white/10 rounded-2xl p-3.5 space-y-3">
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-sm font-black text-white">All-Time F1 Records & Legends</h2>
+                <p class="text-[10px] font-mono text-gray-400">OFFICIAL FIA STATISTICAL ARCHIVE</p>
+              </div>
+              <button onclick="togglePointsNormalizer()" id="normalizer-btn" class="text-[10px] font-mono font-bold px-2.5 py-1.5 rounded-lg border border-f1purple/40 bg-f1purple/15 text-purple-300 transition">
+                2026 PTS NORM: OFF
+              </button>
+            </div>
+
+            <!-- Category Switcher -->
+            <div class="grid grid-cols-3 gap-1 bg-carbon p-1 rounded-xl border border-white/10 text-[10px] font-mono font-bold">
+              <button onclick="switchRecordCategory('drivers')" id="rec-cat-drivers" class="rec-cat-btn py-1.5 rounded-lg bg-f1red text-white">DRIVERS</button>
+              <button onclick="switchRecordCategory('constructors')" id="rec-cat-constructors" class="rec-cat-btn py-1.5 rounded-lg text-gray-400">CONSTRUCTORS</button>
+              <button onclick="switchRecordCategory('circuits')" id="rec-cat-circuits" class="rec-cat-btn py-1.5 rounded-lg text-gray-400">CIRCUITS & TECH</button>
+            </div>
+
+            <!-- Normalized Legend Points Comparison (Shown in Drivers mode) -->
+            <div id="archive-legends-box" class="space-y-2 pt-1">
+              <div class="text-[10px] font-mono text-gray-400 uppercase">Career Points Comparison (Toggle Normalizer Above)</div>
+              <div id="archive-legends-list" class="space-y-1.5"></div>
+            </div>
+
+            <!-- All-Time Record Cards -->
+            <div id="archive-records-cards" class="space-y-2 pt-1">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- SUB-VIEW 3: F1 FACTS & TRIVIA DECK -->
+        <div id="archive-sub-facts" class="hidden space-y-3">
+          <!-- Featured Interactive Fact Spotlight Card -->
+          <div class="relative rounded-2xl border border-f1red/40 bg-gradient-to-br from-[#23141B] via-slatepanel to-carbon p-4 space-y-2.5 shadow-lg">
+            <div class="flex items-center justify-between">
+              <span id="spotlight-fact-cat" class="text-[10px] font-mono font-extrabold px-2 py-0.5 rounded bg-f1red/20 text-f1red border border-f1red/40">ENGINEERING</span>
+              <span id="spotlight-fact-index" class="text-[10px] font-mono text-gray-400">FACT #1 OF 10</span>
+            </div>
+            <h3 id="spotlight-fact-title" class="text-sm font-black text-white leading-snug">5G Peak Braking Deceleration</h3>
+            <p id="spotlight-fact-body" class="text-xs text-gray-300 leading-relaxed">Under heavy braking from 340 km/h into Turn 1 at Monza, F1 drivers experience over 5G of longitudinal deceleration—equivalent to hitting a brick wall, pushing 1,000°C carbon-carbon brake discs to glow bright orange.</p>
+            <div class="pt-1 flex justify-end">
+              <button onclick="nextSpotlightFact()" class="bg-f1red hover:bg-red-600 text-white font-mono font-bold text-[11px] px-3 py-1.5 rounded-xl transition active:scale-95">
+                ⚡ NEXT RANDOM F1 FACT →
+              </button>
+            </div>
+          </div>
+
+          <!-- Complete Curated Facts Feed -->
+          <div class="space-y-2">
+            <div class="text-[10px] font-mono font-bold text-gray-400 uppercase px-1">Verified Engineering & Historical Trivia</div>
+            <div id="archive-facts-list" class="space-y-2">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- SUB-VIEW 4: LAP WORM REPLAY & TYRE STINTS -->
+        <div id="archive-sub-worm" class="hidden space-y-3">
+          <div class="bg-slatepanel border border-white/10 rounded-2xl p-3.5 space-y-3">
+            <div class="flex items-center justify-between">
+              <h3 class="text-xs font-extrabold uppercase tracking-wider text-white">Race Position Worm & Tyre Stints</h3>
+              <span class="text-[10px] font-mono text-f1green">R20 INTERLAGOS</span>
+            </div>
+            <canvas id="worm-canvas" width="380" height="160" class="w-full h-[160px] bg-carbon rounded-xl border border-white/5"></canvas>
+
+            <!-- Tyre Stint Strategy Bars -->
+            <div class="space-y-2 pt-1">
+              <div class="text-[10px] font-mono text-gray-400 uppercase">Tyre Compound Stint Strategy</div>
+              <div class="space-y-1.5 font-mono text-[10px]">
+                <div class="flex items-center gap-2">
+                  <span class="w-8 font-bold text-white">VER</span>
+                  <div class="flex-1 h-4 rounded overflow-hidden flex bg-carbon">
+                    <div class="bg-yellow-400 text-black font-bold flex items-center justify-center" style="width: 42%">M (29L)</div>
+                    <div class="bg-white text-black font-bold flex items-center justify-center" style="width: 58%">H (42L)</div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="w-8 font-bold text-white">NOR</span>
+                  <div class="flex-1 h-4 rounded overflow-hidden flex bg-carbon">
+                    <div class="bg-red-500 text-white font-bold flex items-center justify-center" style="width: 31%">S (22L)</div>
+                    <div class="bg-white text-black font-bold flex items-center justify-center" style="width: 69%">H (49L)</div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="w-8 font-bold text-white">LEC</span>
+                  <div class="flex-1 h-4 rounded overflow-hidden flex bg-carbon">
+                    <div class="bg-yellow-400 text-black font-bold flex items-center justify-center" style="width: 38%">M (27L)</div>
+                    <div class="bg-red-500 text-white font-bold flex items-center justify-center" style="width: 28%">S (20L)</div>
+                    <div class="bg-yellow-400 text-black font-bold flex items-center justify-center" style="width: 34%">M (24L)</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================= -->
+      <!-- TAB 5: OPEN-SOURCE NEWS, TEAM RADIO & DRIVER ONBOARD HUD  -->
+      <!-- ========================================================= -->
+      <section id="view-media" class="hidden p-3.5 space-y-4">
+        <!-- Team Radio Scanner & Audio Waveform -->
+        <div class="bg-slatepanel border border-white/10 rounded-2xl p-3.5 space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-f1red animate-live-dot"></span>
+              <h2 class="text-xs font-extrabold uppercase tracking-wider text-white">Pit-Wall Team Radio Scanner</h2>
+            </div>
+            <span class="text-[10px] font-mono text-gray-400">WEB AUDIO SYNTH</span>
+          </div>
+
+          <div id="radio-clips-list" class="space-y-2">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+
+        <!-- Driver Onboard Telemetry HUD Simulator -->
+        <div class="bg-slatepanel border border-white/10 rounded-2xl overflow-hidden">
+          <div class="px-3.5 py-2.5 border-b border-white/10 flex justify-between items-center">
+            <span class="text-xs font-extrabold uppercase text-white">Onboard Halo Telemetry HUD</span>
+            <span class="text-[10px] font-mono text-f1green">HLS / OPENF1 SYNC</span>
+          </div>
+          <div class="relative h-44 bg-gradient-to-b from-[#10141F] to-[#07090D] flex flex-col justify-between p-3">
+            <img src="https://images.unsplash.com/photo-1541447271487-09612b3f49f7?auto=format&fit=crop&w=800&q=80" onerror="this.style.display='none'" alt="F1 Onboard" class="absolute inset-0 w-full h-full object-cover opacity-35" />
+            <div class="relative z-10 flex justify-between items-center">
+              <span class="bg-black/70 border border-white/15 px-2 py-0.5 rounded text-[10px] font-mono font-bold text-white">CAR #1 • MAX VERSTAPPEN</span>
+              <span class="bg-f1green/20 border border-f1green/40 px-2 py-0.5 rounded text-[10px] font-mono font-bold text-f1green">DRS OPEN</span>
+            </div>
+            <!-- Halo Arc Telemetry Overlay -->
+            <div class="relative z-10 bg-black/80 backdrop-blur-md border border-white/15 rounded-2xl p-2.5 flex items-center justify-around font-mono">
+              <div class="text-center">
+                <div class="text-[9px] text-gray-400">THROTTLE</div>
+                <div id="hud-throttle" class="text-sm font-black text-f1green">100%</div>
+              </div>
+              <div class="text-center border-x border-white/10 px-4">
+                <div id="hud-speed" class="text-xl font-black text-white leading-none">336</div>
+                <div class="text-[9px] text-gray-400">KM/H • GEAR <span id="hud-gear" class="text-amber-400 font-bold">8</span></div>
+              </div>
+              <div class="text-center">
+                <div class="text-[9px] text-gray-400">BRAKE</div>
+                <div id="hud-brake" class="text-sm font-black text-f1red">0%</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Open-Source RSS & FIA Technical Documents Feed -->
+        <div class="space-y-2.5">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-extrabold uppercase tracking-wider text-white">Open-Source RSS & FIA Docs</h3>
+            <span class="text-[10px] font-mono text-gray-400">TAP TO READ</span>
+          </div>
+          <div id="news-feed-list" class="space-y-2">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Slide-Up Driver / Car / Article Dossier Modal Drawer -->
+    <div id="dossier-modal" class="hidden absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col justify-end">
+      <div class="bg-slatepanel border-t border-white/20 rounded-t-3xl max-h-[88%] flex flex-col overflow-hidden shadow-2xl">
+        <div class="p-3.5 border-b border-white/10 flex items-center justify-between shrink-0">
+          <span id="modal-header-tag" class="text-[10px] font-mono font-bold uppercase tracking-wider text-f1red">DRIVER VISUAL & TELEMETRY DOSSIER</span>
+          <button onclick="closeDossierModal()" class="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center justify-center">✕</button>
+        </div>
+        <div id="modal-body-content" class="p-4 overflow-y-auto space-y-4">
+          <!-- Dynamic Content -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom 5-Tab Navigation Bar -->
+    <nav class="bg-slatepanel/95 backdrop-blur-md border-t border-white/10 px-2 py-1.5 flex justify-around items-center shrink-0 z-30">
+      <button onclick="switchMainTab('season')" id="nav-season" class="nav-btn flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-xl text-f1red">
+        <span class="text-base">🗓️</span>
+        <span class="text-[10px] font-extrabold tracking-tight">SEASON</span>
+      </button>
+      <button onclick="switchMainTab('pitwall')" id="nav-pitwall" class="nav-btn flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-xl text-gray-400 hover:text-gray-200">
+        <span class="text-base">🏎️</span>
+        <span class="text-[10px] font-bold tracking-tight">PIT WALL</span>
+      </button>
+      <button onclick="switchMainTab('paddock')" id="nav-paddock" class="nav-btn flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-xl text-gray-400 hover:text-gray-200">
+        <span class="text-base">🛡️</span>
+        <span class="text-[10px] font-bold tracking-tight">PADDOCK</span>
+      </button>
+      <button onclick="switchMainTab('archive')" id="nav-archive" class="nav-btn flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-xl text-gray-400 hover:text-gray-200">
+        <span class="text-base">🏆</span>
+        <span class="text-[10px] font-bold tracking-tight">ARCHIVE</span>
+      </button>
+      <button onclick="switchMainTab('media')" id="nav-media" class="nav-btn flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-xl text-gray-400 hover:text-gray-200">
+        <span class="text-base">📻</span>
+        <span class="text-[10px] font-bold tracking-tight">MEDIA</span>
+      </button>
+    </nav>
+
+  </div>
+
+  <script>
+    // =========================================================================
+    // 1. MULTI-SEASON & TELEMETRY DATASET (2025, 2026 ACTIVE, 2027 UPCOMING)
+    // =========================================================================
+    const SEASONS_DATA = {
+      2025: {
+        label: "2025 FIA Formula 1 World Championship (Archive)",
+        rounds: [
+          { r: 1, name: "Australian GP", circuit: "Albert Park", date: "Mar 16, 2025", winner: "NOR", status: "DONE" },
+          { r: 2, name: "Chinese GP", circuit: "Shanghai", date: "Mar 23, 2025", winner: "VER", status: "DONE" },
+          { r: 3, name: "Japanese GP", circuit: "Suzuka", date: "Apr 06, 2025", winner: "VER", status: "DONE" },
+          { r: 14, name: "Italian GP", circuit: "Monza", date: "Sep 07, 2025", winner: "LEC", status: "DONE" },
+          { r: 24, name: "Abu Dhabi GP", circuit: "Yas Marina", date: "Dec 07, 2025", winner: "NOR", status: "DONE" }
+        ]
+      },
+      2026: {
+        label: "2026 FIA Formula 1 World Championship",
+        rounds: [
+          { r: 1, name: "Australian GP", circuit: "Albert Park", date: "Mar 08, 2026", winner: "LEC", status: "DONE" },
+          { r: 6, name: "Miami GP", circuit: "Miami Autodrome", date: "May 03, 2026", winner: "NOR", status: "DONE" },
+          { r: 12, name: "British GP", circuit: "Silverstone", date: "Jul 05, 2026", winner: "HAM", status: "DONE" },
+          { r: 16, name: "Italian GP", circuit: "Monza", date: "Sep 06, 2026", winner: "LEC", status: "DONE" },
+          { r: 20, name: "São Paulo GP", circuit: "Interlagos", date: "Nov 08, 2026", winner: "VER", status: "PREV" },
+          { r: 21, name: "Las Vegas GP", circuit: "Las Vegas Strip", date: "Nov 22, 2026", winner: "LIVE", status: "LIVE" },
+          { r: 22, name: "Qatar GP", circuit: "Lusail Circuit", date: "Nov 29, 2026", winner: "-", status: "NEXT" },
+          { r: 23, name: "Abu Dhabi GP", circuit: "Yas Marina", date: "Dec 06, 2026", winner: "-", status: "NEXT" }
+        ]
+      },
+      2027: {
+        label: "2027 Provisional FIA Calendar",
+        rounds: [
+          { r: 1, name: "Bahrain GP", circuit: "Sakhir", date: "Mar 07, 2027", winner: "-", status: "NEXT" },
+          { r: 2, name: "Saudi Arabian GP", circuit: "Jeddah Corniche", date: "Mar 21, 2027", winner: "-", status: "NEXT" },
+          { r: 7, name: "Portuguese GP", circuit: "Portimão (Algarve)", date: "May 16, 2027", winner: "-", status: "RETURN" },
+          { r: 11, name: "Turkish GP", circuit: "Istanbul Park", date: "Jun 27, 2027", winner: "-", status: "RETURN" },
+          { r: 24, name: "Abu Dhabi GP", circuit: "Yas Marina", date: "Dec 05, 2027", winner: "-", status: "NEXT" }
+        ]
+      }
+    };
+
+    // Full 22-Car 2026 Grid (11 Constructors including Audi & Cadillac)
+    const DRIVERS_2026 = [
+      { code: "VER", num: 1, name: "Max Verstappen", team: "Red Bull Racing", color: "#3671C6", gap: "LEADER", tyre: "M", tyreAge: 14, sectors: ["P", "G", "G"], speed: 338, gear: 8, wins: 66, poles: 43, titles: 4, h2hQuali: "16 - 4", h2hRace: "15 - 5", portrait: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80", helmetDesc: "2026 Gold & Matte Navy Lion Spec Edition", puStatus: { ICE: "3/4", TC: "3/4", MGU_K: "3/4", ES: "2/2" } },
+      { code: "NOR", num: 4, name: "Lando Norris", team: "McLaren F1", color: "#FF8000", gap: "+1.428", tyre: "M", tyreAge: 13, sectors: ["G", "P", "Y"], speed: 336, gear: 8, wins: 9, poles: 12, titles: 0, h2hQuali: "13 - 7", h2hRace: "12 - 8", portrait: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80", helmetDesc: "Fluro Glitch Carbon Chrome Vegas Edition", puStatus: { ICE: "3/4", TC: "3/4", MGU_K: "3/4", ES: "2/2" } },
+      { code: "LEC", num: 16, name: "Charles Leclerc", team: "Scuderia Ferrari", color: "#E8002D", gap: "+3.105", tyre: "H", tyreAge: 18, sectors: ["G", "G", "P"], speed: 340, gear: 8, wins: 10, poles: 28, titles: 0, h2hQuali: "12 - 8", h2hRace: "11 - 9", portrait: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80", helmetDesc: "Rosso Corsa & Monaco White Tribute Lid", puStatus: { ICE: "4/4", TC: "4/4", MGU_K: "3/4", ES: "2/2" } },
+      { code: "HAM", num: 44, name: "Lewis Hamilton", team: "Scuderia Ferrari", color: "#E8002D", gap: "+5.890", tyre: "H", tyreAge: 17, sectors: ["Y", "G", "G"], speed: 337, gear: 8, wins: 106, poles: 105, titles: 7, h2hQuali: "8 - 12", h2hRace: "9 - 11", portrait: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=400&q=80", helmetDesc: "2026 Ferrari Yellow & Iridescent Purple", puStatus: { ICE: "3/4", TC: "3/4", MGU_K: "3/4", ES: "2/2" } },
+      { code: "PIA", num: 81, name: "Oscar Piastri", team: "McLaren F1", color: "#FF8000", gap: "+8.412", tyre: "M", tyreAge: 15, sectors: ["G", "Y", "G"], speed: 335, gear: 8, wins: 4, poles: 3, titles: 0, h2hQuali: "7 - 13", h2hRace: "8 - 12", portrait: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=400&q=80", helmetDesc: "Papaya & Aussie Southern Cross Carbon", puStatus: { ICE: "3/4", TC: "3/4", MGU_K: "3/4", ES: "2/2" } },
+      { code: "RUS", num: 63, name: "George Russell", team: "Mercedes-AMG", color: "#27F4D2", gap: "+11.204", tyre: "H", tyreAge: 19, sectors: ["G", "G", "Y"], speed: 334, gear: 8, wins: 4, poles: 5, titles: 0, h2hQuali: "14 - 6", h2hRace: "13 - 7", portrait: "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=400&q=80", helmetDesc: "Petronas Teal & Mercedes Star Chrome", puStatus: { ICE: "3/4", TC: "3/4", MGU_K: "3/4", ES: "2/2" } },
+      { code: "ANT", num: 12, name: "Kimi Antonelli", team: "Mercedes-AMG", color: "#27F4D2", gap: "+14.610", tyre: "S", tyreAge: 6, sectors: ["P", "G", "G"], speed: 339, gear: 8, wins: 1, poles: 1, titles: 0, h2hQuali: "6 - 14", h2hRace: "7 - 13", portrait: "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=400&q=80", helmetDesc: "Tricolore & Silver Arrow Rookie Spec", puStatus: { ICE: "4/4", TC: "3/4", MGU_K: "3/4", ES: "2/2" } },
+      { code: "ALO", num: 14, name: "Fernando Alonso", team: "Aston Martin", color: "#229971", gap: "+18.902", tyre: "H", tyreAge: 21, sectors: ["Y", "G", "G"], speed: 332, gear: 8, wins: 32, poles: 22, titles: 2, h2hQuali: "15 - 5", h2hRace: "16 - 4", portrait: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=400&q=80", helmetDesc: "Classic Asturias Blue, Yellow & Red Arrows", puStatus: { ICE: "3/4", TC: "3/4", MGU_K: "3/4", ES: "2/2" } },
+      { code: "SAI", num: 55, name: "Carlos Sainz", team: "Williams Racing", color: "#64C4FF", gap: "+22.140", tyre: "M", tyreAge: 12, sectors: ["G", "Y", "G"], speed: 333, gear: 8, wins: 4, poles: 6, titles: 0, h2hQuali: "15 - 5", h2hRace: "14 - 6", portrait: "https://images.unsplash.com/photo-1519345182560-3f2917c472ef?auto=format&fit=crop&w=400&q=80", helmetDesc: "Chili Pepper Matte Red & Grove Navy", puStatus: { ICE: "3/4", TC: "3/4", MGU_K: "3/4", ES: "2/2" } },
+      { code: "HUL", num: 27, name: "Nico Hülkenberg", team: "Audi F1 Team", color: "#F50537", gap: "+25.880", tyre: "H", tyreAge: 18, sectors: ["G", "G", "Y"], speed: 331, gear: 8, wins: 0, poles: 1, titles: 0, h2hQuali: "13 - 7", h2hRace: "12 - 8", portrait: "https://images.unsplash.com/photo-1531427186611-ecfd6d936c79?auto=format&fit=crop&w=400&q=80", helmetDesc: "Audi Quattro Titanium & Crimson Spec", puStatus: { ICE: "4/4", TC: "4/4", MGU_K: "3/4", ES: "2/2" } },
+      { code: "HAD", num: 6, name: "Isack Hadjar", team: "Red Bull Racing", color: "#3671C6", gap: "+27.410", tyre: "M", tyreAge: 14, sectors: ["G", "Y", "Y"], speed: 332, gear: 8, wins: 0, poles: 0, titles: 0, h2hQuali: "4 - 16", h2hRace: "5 - 15", portrait: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80", helmetDesc: "Parisian Blue & Red Bull Chrome Lid", puStatus: { ICE: "3/4", TC: "3/4", MGU_K: "3/4", ES: "2/2" } },
+      { code: "ALB", num: 23, name: "Alexander Albon", team: "Williams Racing", color: "#64C4FF", gap: "+29.115", tyre: "H", tyreAge: 19, sectors: ["Y", "G", "Y"], speed: 330, gear: 8, wins: 0, poles: 0, titles: 0, h2hQuali: "5 - 15", h2hRace: "6 - 14", portrait: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80", helmetDesc: "Thai Flag & Duracell Copper Spec", puStatus: { ICE: "3/4", TC: "3/4", MGU_K: "3/4", ES: "2/2" } },
+      { code: "LAW", num: 30, name: "Liam Lawson", team: "Racing Bulls", color: "#6692FF", gap: "+31.040", tyre: "M", tyreAge: 13, sectors: ["G", "Y", "G"], speed: 329, gear: 8, wins: 0, poles: 0, titles: 0, h2hQuali: "11 - 9", h2hRace: "12 - 8", portrait: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=400&q=80", helmetDesc: "Kiwi Silver Fern & Matte Black Lid", puStatus: { ICE: "4/4", TC: "3/4", MGU_K: "3/4", ES: "2/2" } },
+      { code: "BEA", num: 87, name: "Oliver Bearman", team: "Haas F1 Team", color: "#B6BABD", gap: "+32.890", tyre: "S", tyreAge: 7, sectors: ["G", "G", "Y"], speed: 331, gear: 8, wins: 0, poles: 0, titles: 0, h2hQuali: "11 - 9", h2hRace: "10 - 10", portrait: "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=400&q=80", helmetDesc: "British Racing Blue & Bear Claw Spec", puStatus: { ICE: "4/4", TC: "4/4", MGU_K: "3/4", ES: "2/2" } },
+      { code: "STR", num: 18, name: "Lance Stroll", team: "Aston Martin", color: "#229971", gap: "+34.512", tyre: "H", tyreAge: 20, sectors: ["Y", "Y", "G"], speed: 328, gear: 8, wins: 0, poles: 1, titles: 0, h2hQuali: "5 - 15", h2hRace: "4 - 16", portrait: "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=400&q=80", helmetDesc: "Aston Martin Green & Maple Leaf Carbon", puStatus: { ICE: "4/4", TC: "3/4", MGU_K: "3/4", ES: "2/2" } },
+      { code: "BOR", num: 5, name: "Gabriel Bortoleto", team: "Audi F1 Team", color: "#F50537", gap: "+36.220", tyre: "M", tyreAge: 14, sectors: ["G", "Y", "Y"], speed: 329, gear: 8, wins: 0, poles: 0, titles: 0, h2hQuali: "7 - 13", h2hRace: "8 - 12", portrait: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=400&q=80", helmetDesc: "Brazilian Yellow & Green Senna Tribute", puStatus: { ICE: "4/4", TC: "4/4", MGU_K: "3/4", ES: "2/2" } },
+      { code: "GAS", num: 10, name: "Pierre Gasly", team: "Alpine F1", color: "#FF87BC", gap: "+38.105", tyre: "H", tyreAge: 21, sectors: ["Y", "G", "Y"], speed: 327, gear: 8, wins: 1, poles: 0, titles: 0, h2hQuali: "12 - 8", h2hRace: "11 - 9", portrait: "https://images.unsplash.com/photo-1519345182560-3f2917c472ef?auto=format&fit=crop&w=400&q=80", helmetDesc: "French Tricolore & Alpine Pink Lid", puStatus: { ICE: "3/4", TC: "3/4", MGU_K: "3/4", ES: "2/2" } },
+      { code: "OCO", num: 31, name: "Esteban Ocon", team: "Haas F1 Team", color: "#B6BABD", gap: "+39.840", tyre: "H", tyreAge: 19, sectors: ["Y", "Y", "G"], speed: 327, gear: 8, wins: 1, poles: 0, titles: 0, h2hQuali: "9 - 11", h2hRace: "10 - 10", portrait: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=400&q=80", helmetDesc: "Matte Red & Black Normandy Spec", puStatus: { ICE: "4/4", TC: "4/4", MGU_K: "3/4", ES: "2/2" } },
+      { code: "LIN", num: 41, name: "Arvid Lindblad", team: "Racing Bulls", color: "#6692FF", gap: "+41.550", tyre: "S", tyreAge: 6, sectors: ["G", "G", "Y"], speed: 328, gear: 8, wins: 0, poles: 0, titles: 0, h2hQuali: "9 - 11", h2hRace: "8 - 12", portrait: "https://images.unsplash.com/photo-1531427186611-ecfd6d936c79?auto=format&fit=crop&w=400&q=80", helmetDesc: "Red Bull Junior Chrome & Royal Blue", puStatus: { ICE: "4/4", TC: "3/4", MGU_K: "3/4", ES: "2/2" } },
+      { code: "COL", num: 43, name: "Franco Colapinto", team: "Alpine F1", color: "#FF87BC", gap: "+43.210", tyre: "M", tyreAge: 12, sectors: ["G", "Y", "Y"], speed: 326, gear: 8, wins: 0, poles: 0, titles: 0, h2hQuali: "8 - 12", h2hRace: "9 - 11", portrait: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80", helmetDesc: "Albiceleste Sky Blue & Sun of May Lid", puStatus: { ICE: "3/4", TC: "3/4", MGU_K: "3/4", ES: "2/2" } },
+      { code: "BOT", num: 77, name: "Valtteri Bottas", team: "Cadillac F1", color: "#D4AF37", gap: "+45.405", tyre: "M", tyreAge: 11, sectors: ["Y", "G", "G"], speed: 325, gear: 8, wins: 10, poles: 20, titles: 0, h2hQuali: "12 - 8", h2hRace: "11 - 9", portrait: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?auto=format&fit=crop&w=400&q=80", helmetDesc: "Cadillac V-Series Gold & Nastola Blue", puStatus: { ICE: "3/4", TC: "3/4", MGU_K: "3/4", ES: "2/2" } },
+      { code: "PER", num: 11, name: "Sergio Pérez", team: "Cadillac F1", color: "#D4AF37", gap: "+47.920", tyre: "H", tyreAge: 18, sectors: ["Y", "Y", "Y"], speed: 324, gear: 8, wins: 6, poles: 3, titles: 0, h2hQuali: "8 - 12", h2hRace: "9 - 11", portrait: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80", helmetDesc: "Aztec Gold & Mexican Flag Tribute Lid", puStatus: { ICE: "4/4", TC: "3/4", MGU_K: "3/4", ES: "2/2" } }
+    ];
+
+    const CARS_2026 = [
+      {
+        team: "Red Bull Racing", chassis: "RB22 • Red Bull Ford DM01 PU", color: "#3671C6",
+        img: "https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?auto=format&fit=crop&w=800&q=80",
+        aeroNote: "Active X-Mode Low-Drag Front Wing & Undercut Sidepod Inlet (Vegas Spec)",
+        avgPit: "2.18s"
+      },
+      {
+        team: "Scuderia Ferrari", chassis: "SF-26 • Ferrari 067/6 Hybrid PU", color: "#E8002D",
+        img: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=800&q=80",
+        aeroNote: "Pull-Rod Front Suspension & Monza/Vegas Spoon Rear Beam Wing",
+        avgPit: "2.24s"
+      },
+      {
+        team: "Audi F1 Team", chassis: "R26 • Audi Neuburg 2026 Hybrid", color: "#F50537",
+        img: "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=800&q=80",
+        aeroNote: "Debut Works Titanium/Crimson Livery • Revised Floor Edge Venturi",
+        avgPit: "2.49s"
+      }
+    ];
+
+    const CIRCUITS_VAULT = [
+      {
+        name: "Las Vegas Strip Circuit", country: "USA • Round 21", length: "6.201 km", topSpeed: "352 km/h",
+        cornerName: "Turn 14 — The Sphere Chicane",
+        cornerDesc: "Heavy 345 km/h braking zone into a tight left-right technical complex under cold desert night grip.",
+        img: "https://images.unsplash.com/photo-1581351721010-8cf859cb14a4?auto=format&fit=crop&w=800&q=80"
+      },
+      {
+        name: "Autódromo José Carlos Pace", country: "Brazil • Round 20", length: "4.309 km", topSpeed: "334 km/h",
+        cornerName: "Turns 1–3 — Senna 'S' & Curva do Sol",
+        cornerDesc: "Dramatic 15-meter elevation drop into a blind left-hand apex with prime overtaking slipstream.",
+        img: "https://images.unsplash.com/photo-1518609878373-06d740f60d8b?auto=format&fit=crop&w=800&q=80"
+      }
+    ];
+
+    const RADIO_CLIPS = [
+      { id: 1, driver: "VER", teamColor: "#3671C6", lap: "LAP 37", text: "Battery deployment on the Strip straight feels mega. Watch Norris into Turn 14." },
+      { id: 2, driver: "LEC", teamColor: "#E8002D", lap: "LAP 36", text: "Front left tyre temperature is coming up nicely now, push mode available." },
+      { id: 3, driver: "NOR", teamColor: "#FF8000", lap: "LAP 35", text: "Copy, closing two tenths per lap in Sector 2. Keep me updated on pit window." }
+    ];
+
+    const NEWS_ARTICLES = [
+      {
+        id: 1,
+        source: "FIA TECHNICAL DOC #48", time: "12m ago", tag: "SCRUTINEERING",
+        title: "2026 Active Aerodynamics Z-Mode / X-Mode Activation Zones Confirmed for Las Vegas Strip",
+        summary: "FIA Technical Delegate confirms dual active-wing straightline deployment markers along Koval Lane and Las Vegas Boulevard.",
+        body: "The FIA Formula 1 Technical Delegate has issued Technical Directive #48 ahead of Round 21 in Las Vegas, detailing the exact telemetry activation loops for 2026 X-Mode (low-drag straightline) and Z-Mode (high-downforce cornering) front and rear wing actuation. Both zones span the 1.9km Las Vegas Boulevard straight and Koval Lane."
+      },
+      {
+        id: 2,
+        source: "OPENF1 TELEMETRY", time: "41m ago", tag: "DATA STREAM",
+        title: "350kW MGU-K Override Mode Usage Spike Recorded During Qualifying Runs",
+        summary: "Telemetry logs show Ferrari and Red Bull deploying peak electrical override between Turns 12 and 14.",
+        body: "Open-source telemetry captured via the OpenF1 live stream indicates that teams are harvesting maximum electrical energy under braking into Turn 5 and Turn 14 to deploy full 350kW MGU-K Manual Override boosts past 335 km/h down the Strip."
+      },
+      {
+        id: 3,
+        source: "AUTOSPORT RSS", time: "2h ago", tag: "PADDOCK",
+        title: "Audi & Cadillac Complete First Full-Season Reliability Milestone Ahead of Finale",
+        summary: "Both new 2026 power unit entrants log zero mechanical DNFs across the Americas triple-header.",
+        body: "Both Audi F1 Team (Neuburg PU) and Cadillac Formula 1 Team have successfully completed the grueling Americas triple-header without a single internal combustion or energy store failure, validating their 2026 homologation packages."
+      }
+    ];
+
+    const ALL_RACES_ARCHIVE = [
+      { id: 1, raceNum: 1, year: 1950, decade: "1950s", gp: "British Grand Prix", circuit: "Silverstone Circuit", country: "UK", winner: "Giuseppe Farina", team: "Alfa Romeo", p2: "Luigi Fagioli", p3: "Reg Parnell", pole: "Giuseppe Farina", fastestLap: "Giuseppe Farina (1:50.6)", laps: 70, length: "4.649 km", weather: "Sunny & Dry", story: "The very first FIA Formula 1 World Championship race in history, attended by King George VI. Alfa Romeo dominated with a 1-2-3 lockout of the podium." },
+      { id: 2, raceNum: 61, year: 1957, decade: "1950s", gp: "German Grand Prix", circuit: "Nürburgring Nordschleife", country: "Germany", winner: "Juan Manuel Fangio", team: "Maserati", p2: "Mike Hawthorn", p3: "Peter Collins", pole: "Juan Manuel Fangio", fastestLap: "Juan Manuel Fangio (9:17.4)", laps: 22, length: "22.810 km", weather: "Warm & Dry", story: "Widely hailed as the greatest drive in F1 history. After a botched pit stop left Fangio 48 seconds behind Hawthorn and Collins, he broke the Nordschleife lap record nine times in ten laps to win on the penultimate lap." },
+      { id: 3, raceNum: 158, year: 1967, decade: "1960s", gp: "Italian Grand Prix", circuit: "Autodromo Nazionale Monza", country: "Italy", winner: "John Surtees", team: "Honda", p2: "Jack Brabham", p3: "Jim Clark", pole: "Jim Clark", fastestLap: "Jim Clark (1:28.5)", laps: 68, length: "5.750 km", weather: "Dry", story: "Jim Clark recovered from a puncture that cost him a full lap to retake the lead, only to run out of fuel on the final lap—handing Honda a thrilling slipstream victory by 0.2 seconds over Brabham." },
+      { id: 4, raceNum: 206, year: 1971, decade: "1970s", gp: "Italian Grand Prix", circuit: "Autodromo Nazionale Monza", country: "Italy", winner: "Peter Gethin", team: "BRM", p2: "Ronnie Peterson", p3: "François Cevert", pole: "Chris Amon", fastestLap: "Henri Pescarolo (1:23.8)", laps: 55, length: "5.750 km", weather: "Sunny", story: "The closest five-car finish in Formula 1 history. Peter Gethin edged Ronnie Peterson by just 0.01 seconds, with the top five cars separated by only 0.61 seconds at the chequered flag." },
+      { id: 5, raceNum: 280, year: 1976, decade: "1970s", gp: "Japanese Grand Prix", circuit: "Fuji Speedway", country: "Japan", winner: "Mario Andretti", team: "Lotus-Ford", p2: "Patrick Depailler", p3: "James Hunt", pole: "Mario Andretti", fastestLap: "Jacques Laffite (1:19.97)", laps: 73, length: "4.359 km", weather: "Torrential Rain", story: "The dramatic 1976 title decider in monsoon conditions. Niki Lauda voluntarily withdrew citing unsafe visibility just weeks after his fiery Nürburgring crash, while James Hunt charged to P3 to clinch the championship by a single point." },
+      { id: 6, raceNum: 394, year: 1984, decade: "1980s", gp: "Monaco Grand Prix", circuit: "Circuit de Monaco", country: "Monaco", winner: "Alain Prost", team: "McLaren-TAG", p2: "Ayrton Senna", p3: "René Arnoux", pole: "Alain Prost", fastestLap: "Ayrton Senna (1:54.334)", laps: 31, length: "3.312 km", weather: "Heavy Rain (Red Flag)", story: "Ayrton Senna announced his arrival in F1, charging from 13th in an uncompetitive Toleman-Hart through torrential rain to catch leader Alain Prost at 4 seconds per lap before the race was red-flagged on Lap 31." },
+      { id: 7, raceNum: 467, year: 1988, decade: "1980s", gp: "Japanese Grand Prix", circuit: "Suzuka Circuit", country: "Japan", winner: "Ayrton Senna", team: "McLaren-Honda", p2: "Alain Prost", p3: "Thierry Boutsen", pole: "Ayrton Senna", fastestLap: "Ayrton Senna (1:46.326)", laps: 51, length: "5.859 km", weather: "Light Rain / Damp", story: "Senna stalled on the pole grid spot, dropping to 14th into Turn 1. Using Suzuka's downhill pit straight to bump-start his engine, he overtook 13 cars in 27 laps to pass Prost and claim his maiden World Championship." },
+      { id: 8, raceNum: 535, year: 1993, decade: "1990s", gp: "European Grand Prix", circuit: "Donington Park", country: "UK", winner: "Ayrton Senna", team: "McLaren-Ford", p2: "Damon Hill", p3: "Alain Prost", pole: "Alain Prost", fastestLap: "Ayrton Senna (1:18.029)", laps: 76, length: "4.023 km", weather: "Changeable Rain", story: "Home of the 'Lap of the Gods': starting 4th and dropping to 5th off the line, Ayrton Senna passed Schumacher, Wendlinger, Hill, and Prost in treacherous wet conditions before completing Lap 1." },
+      { id: 9, raceNum: 627, year: 1998, decade: "1990s", gp: "Belgian Grand Prix", circuit: "Spa-Francorchamps", country: "Belgium", winner: "Damon Hill", team: "Jordan-Mugen-Honda", p2: "Ralf Schumacher", p3: "Jean Alesi", pole: "Mika Häkkinen", fastestLap: "Michael Schumacher (2:03.766)", laps: 44, length: "6.968 km", weather: "Monsoon Rain", story: "After a 13-car pileup on the opening lap and Michael Schumacher's infamous three-wheeled collision with David Coulthard, Damon Hill led Ralf Schumacher home for Jordan's historic first-ever Grand Prix win." },
+      { id: 10, raceNum: 803, year: 2008, decade: "2000s", gp: "Brazilian Grand Prix", circuit: "Interlagos", country: "Brazil", winner: "Felipe Massa", team: "Ferrari", p2: "Fernando Alonso", p3: "Kimi Räikkönen", pole: "Felipe Massa", fastestLap: "Felipe Massa (1:13.736)", laps: 71, length: "4.309 km", weather: "Late Rain Shower", story: "'Is that Glock?!' Felipe Massa crossed the line as World Champion for 38 seconds before Lewis Hamilton overtook Timo Glock on dry tyres at the final corner to steal P5 and his first title by 1 point." },
+      { id: 11, raceNum: 846, year: 2011, decade: "2010s", gp: "Canadian Grand Prix", circuit: "Circuit Gilles Villeneuve", country: "Canada", winner: "Jenson Button", team: "McLaren-Mercedes", p2: "Sebastian Vettel", p3: "Mark Webber", pole: "Sebastian Vettel", fastestLap: "Jenson Button (1:16.956)", laps: 70, length: "4.361 km", weather: "Torrential Rain / Drying", story: "The longest race in F1 history (4 hours, 4 minutes). Jenson Button survived six pit stops, a drive-through penalty, and two collisions to charge from last place on Lap 40 and force Sebastian Vettel into a final-lap error." },
+      { id: 12, raceNum: 1057, year: 2021, decade: "2020s", gp: "Abu Dhabi Grand Prix", circuit: "Yas Marina Circuit", country: "UAE", winner: "Max Verstappen", team: "Red Bull Racing", p2: "Lewis Hamilton", p3: "Carlos Sainz", pole: "Max Verstappen", fastestLap: "Max Verstappen (1:26.103)", laps: 58, length: "5.281 km", weather: "Clear Night", story: "Entering the finale tied on 369.5 points, a late Safety Car deployment set up a one-lap shootout where Max Verstappen on fresh soft tyres passed Lewis Hamilton at Turn 5 to claim his first World Championship." },
+      { id: 13, raceNum: 1122, year: 2024, decade: "2020s", gp: "São Paulo Grand Prix", circuit: "Interlagos", country: "Brazil", winner: "Max Verstappen", team: "Red Bull Racing", p2: "Esteban Ocon", p3: "Pierre Gasly", pole: "Lando Norris", fastestLap: "Max Verstappen (1:20.472)", laps: 69, length: "4.309 km", weather: "Heavy Rain", story: "Starting P17 after a grid penalty and red-flagged qualifying, Max Verstappen sliced through the wet field and set 17 fastest laps to win by 19 seconds ahead of a shock double Alpine podium." },
+      { id: 14, raceNum: 1146, year: 2026, decade: "2020s", gp: "Australian Grand Prix", circuit: "Albert Park", country: "Australia", winner: "Charles Leclerc", team: "Scuderia Ferrari", p2: "Lando Norris", p3: "Max Verstappen", pole: "Charles Leclerc", fastestLap: "Lando Norris (1:19.210)", laps: 58, length: "5.278 km", weather: "Sunny", story: "Dawn of the 2026 Active Aerodynamics & 350kW Hybrid Regulations. Charles Leclerc mastered X-Mode energy harvesting to win the season opener for Ferrari, while Audi and Cadillac scored points on debut." },
+      { id: 15, raceNum: 1165, year: 2026, decade: "2020s", gp: "São Paulo Grand Prix", circuit: "Interlagos", country: "Brazil", winner: "Max Verstappen", team: "Red Bull Racing", p2: "Lando Norris", p3: "Charles Leclerc", pole: "Lando Norris", fastestLap: "Kimi Antonelli (1:11.884)", laps: 71, length: "4.309 km", weather: "Partly Cloudy", story: "Round 20 thriller at Interlagos featuring a 3-way late-race MGU-K Override battle down the Reta Oposta between Verstappen, Norris, and Leclerc." }
+    ];
+
+    const ALL_TIME_RECORDS = {
+      drivers: [
+        { title: "Most World Championships", holder: "Michael Schumacher & Lewis Hamilton", value: "7 TITLES", detail: "1994–2004 (Schumacher) • 2008–2020 (Hamilton)" },
+        { title: "Most Grand Prix Wins", holder: "Lewis Hamilton", value: "106 WINS", detail: "First: 2007 Canada • Latest: 2026 Silverstone" },
+        { title: "Most Pole Positions", holder: "Lewis Hamilton", value: "105 POLES", detail: "All-time qualifying benchmark across 3 eras" },
+        { title: "Most Podium Finishes", holder: "Lewis Hamilton", value: "204 PODIUMS", detail: "Over 53% career podium strike rate" },
+        { title: "Most Consecutive Race Wins", holder: "Max Verstappen", value: "10 IN A ROW", detail: "2023 Miami GP through 2023 Italian GP" },
+        { title: "Youngest Grand Prix Winner", holder: "Max Verstappen", value: "18Y 228D", detail: "2016 Spanish Grand Prix (Red Bull debut)" }
+      ],
+      constructors: [
+        { title: "Most Constructors' Championships", holder: "Scuderia Ferrari", value: "16 TITLES", detail: "Competing in every F1 season since 1950" },
+        { title: "Most Constructor Race Wins", holder: "Scuderia Ferrari", value: "249 WINS", detail: "Over 1,100 Grand Prix starts" },
+        { title: "Highest Single-Season Win %", holder: "Red Bull Racing (RB19)", value: "95.45%", detail: "21 wins from 22 races in 2023" },
+        { title: "Fastest Stationary Pit Stop", holder: "McLaren F1 Team", value: "1.80 SEC", detail: "2023 Qatar Grand Prix (Lando Norris)" }
+      ],
+      circuits: [
+        { title: "Highest Official Race Top Speed", holder: "Valtteri Bottas (Williams)", value: "372.5 KM/H", detail: "2016 Mexican GP (Autódromo Hermanos Rodríguez)" },
+        { title: "Most Hosted Grands Prix", holder: "Autodromo Nazionale Monza", value: "76 RACES", detail: "The Temple of Speed • Every year except 1980" },
+        { title: "Fastest Pole Lap Average Speed", holder: "Lewis Hamilton (Monza)", value: "264.36 KM/H", detail: "2020 Italian GP Q3 (1:18.887)" },
+        { title: "Closest Finish in F1 History", holder: "1971 Italian GP (Monza)", value: "0.010 SEC", detail: "Peter Gethin over Ronnie Peterson" }
+      ]
+    };
+
+    const F1_FACTS_DECK = [
+      { cat: "ENGINEERING", title: "5G Peak Braking Deceleration", body: "Under heavy braking from 340 km/h into Turn 1 at Monza, F1 drivers experience over 5G of longitudinal deceleration—pushing 1,000°C carbon-carbon brake discs to glow bright orange." },
+      { cat: "AERODYNAMICS", title: "Driving Upside Down on a Ceiling", body: "At speeds above 210 km/h, a modern Formula 1 car generates more vertical aerodynamic downforce than its own 768 kg minimum weight—meaning it could theoretically drive upside down on the roof of a tunnel." },
+      { cat: "RULES & CRAZY MOMENTS", title: "Three Drivers Tied to 0.000 Seconds", body: "In qualifying for the 1997 European Grand Prix at Jerez, Jacques Villeneuve, Michael Schumacher, and Heinz-Harald Frentzen all set the exact same lap time of 1:21.072 down to the thousandth of a second." },
+      { cat: "ENGINEERING", title: "The 1976 Six-Wheeler Winner", body: "The Tyrrell P34 used four tiny 10-inch front wheels to reduce aerodynamic drag while maintaining front contact patch—and actually won the 1976 Swedish Grand Prix." },
+      { cat: "ENGINEERING", title: "Brabham BT46B 'Fan Car' Ban", body: "Gordon Murray's 1978 Brabham BT46B featured a massive rear cooling fan that sucked the car onto the tarmac. Niki Lauda won its only race in Sweden by 34 seconds before it was voluntarily withdrawn." },
+      { cat: "PHYSICAL DEMANDS", title: "3 Litres of Sweat Lost Per Race", body: "In humid night races like Singapore or Qatar, cockpit temperatures exceed 50°C and drivers lose up to 3 kg (6.6 lbs) of body weight in sweat over two hours." },
+      { cat: "SAFETY", title: "Halo Titanium Strength", body: "Introduced in 2018, the Grade-5 titanium Halo cockpit protection bar weighs just 7 kg yet can withstand the weight of a 12-tonne London double-decker bus." },
+      { cat: "2026 TECH", title: "350kW Electrical Power Surge", body: "2026 Formula 1 Power Units nearly triple electrical MGU-K output from 120kW to 350kW (470 bhp), creating a near 50/50 split between internal combustion and battery power." }
+    ];
+
+    // =========================================================================
+    // 2. APPLICATION STATE & INITIALIZATION
+    // =========================================================================
+    const state = {
+      activeTab: 'season',
+      selectedYear: 2026,
+      activeCircuit: 'vegas',
+      pitSubView: 'timing',
+      archiveSubTab: 'races',
+      selectedDecade: 'ALL',
+      recordCategory: 'drivers',
+      spotlightFactIndex: 0,
+      focusedDriverCode: 'VER',
+      replaySpeed: 1,
+      cameraFollow: false,
+      pointsNormalized: false,
+      playingRadioId: null,
+      scrubNormX: 0.42,
+      isScrubbing: false,
+      audioCtx: null,
+      carAngles: DRIVERS_2026.map((_, idx) => idx * 0.28)
+    };
+
+    function initApp() {
+      renderSeasonCalendar(2026);
+      renderTimingTower();
+      renderPaddockDrivers();
+      renderPaddockCars();
+      renderPaddockCircuits();
+      renderDecadePills();
+      renderAllRacesVault();
+      renderArchiveLegends();
+      renderAllTimeRecords();
+      renderF1FactsDeck();
+      renderRadioClips();
+      renderNewsFeed();
+      setupTelemetryScrubber();
+      startLiveSimulationLoop();
+    }
+
+    // =========================================================================
+    // 3. NAVIGATION & TAB SWITCHING
+    // =========================================================================
+    function switchMainTab(tabId) {
+      state.activeTab = tabId;
+      ['season', 'pitwall', 'paddock', 'archive', 'media'].forEach(t => {
+        document.getElementById(`view-${t}`).classList.add('hidden');
+        const btn = document.getElementById(`nav-${t}`);
+        btn.classList.remove('text-f1red');
+        btn.classList.add('text-gray-400');
+      });
+
+      const activeView = document.getElementById(`view-${tabId}`);
+      activeView.classList.remove('hidden');
+      if (tabId === 'pitwall') activeView.classList.add('flex');
+
+      const activeBtn = document.getElementById(`nav-${tabId}`);
+      activeBtn.classList.remove('text-gray-400');
+      activeBtn.classList.add('text-f1red');
+
+      if (tabId === 'pitwall' && state.pitSubView === 'telemetry') {
+        drawTelemetryCharts();
+      }
+      if (tabId === 'archive' && state.archiveSubTab === 'worm') {
+        drawWormChart();
+      }
+    }
+
+    function launchPitWall(circuitKey) {
+      state.activeCircuit = circuitKey;
+      document.getElementById('pitwall-circuit-select').value = circuitKey;
+      if (circuitKey === 'vegas') {
+        document.getElementById('header-session-title').innerText = "R21 • LAS VEGAS GP";
+        document.getElementById('header-sub-info').innerHTML = 'LAP <span id="header-lap-num">38</span>/50 • TRACK 21°C • AIR 16°C • DRS ENABLED';
+      } else {
+        document.getElementById('header-session-title').innerText = "R20 • SÃO PAULO GP";
+        document.getElementById('header-sub-info').innerHTML = 'LAP <span id="header-lap-num">71</span>/71 • INTERLAGOS REPLAY • TRACK 29°C';
+      }
+      switchMainTab('pitwall');
+    }
+
+    function switchPitSubView(sub) {
+      state.pitSubView = sub;
+      ['timing', 'track', 'telemetry'].forEach(s => {
+        document.getElementById(`pit-sub-${s}`).classList.add('hidden');
+        const btn = document.getElementById(`sub-btn-${s}`);
+        btn.classList.remove('bg-f1red', 'text-white');
+        btn.classList.add('text-gray-400');
+      });
+      document.getElementById(`pit-sub-${sub}`).classList.remove('hidden');
+      const activeBtn = document.getElementById(`sub-btn-${sub}`);
+      activeBtn.classList.remove('text-gray-400');
+      activeBtn.classList.add('bg-f1red', 'text-white');
+
+      if (sub === 'telemetry') drawTelemetryCharts();
+    }
+
+    // =========================================================================
+    // 4. SEASON CALENDAR RENDERER (2025 / 2026 / 2027)
+    // =========================================================================
+    function selectSeasonYear(year) {
+      state.selectedYear = year;
+      [2025, 2026, 2027].forEach(y => {
+        const pill = document.getElementById(`year-btn-${y}`);
+        if (y === year) {
+          pill.classList.add('bg-f1red', 'text-white', 'shadow');
+          pill.classList.remove('text-gray-400');
+        } else {
+          pill.classList.remove('bg-f1red', 'text-white', 'shadow');
+          pill.classList.add('text-gray-400');
+        }
+      });
+      renderSeasonCalendar(year);
+    }
+
+    function renderSeasonCalendar(year) {
+      const data = SEASONS_DATA[year];
+      document.getElementById('calendar-list-heading').innerText = data.label;
+      document.getElementById('calendar-round-count').innerText = `${data.rounds.length} KEY ROUNDS`;
+
+      const container = document.getElementById('season-calendar-list');
+      container.innerHTML = data.rounds.map(item => {
+        let badge = `<span class="text-[10px] font-mono px-2 py-0.5 rounded bg-white/5 text-gray-400">${item.date}</span>`;
+        if (item.status === 'LIVE') {
+          badge = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-f1red text-white">● LIVE NOW</span>`;
+        } else if (item.status === 'PREV') {
+          badge = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-f1green/20 text-f1green">WIN: ${item.winner}</span>`;
+        } else if (item.status === 'RETURN') {
+          badge = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-f1purple/20 text-purple-300">2027 RETURN</span>`;
+        } else if (item.winner !== '-') {
+          badge = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-white/10 text-gray-200">WIN: ${item.winner}</span>`;
+        }
+
+        return `
+          <div onclick="launchPitWall('${item.r === 20 ? 'interlagos' : 'vegas'}')" class="bg-slatepanel hover:bg-slatecard border border-white/10 rounded-xl p-3 flex items-center justify-between cursor-pointer transition">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-lg bg-carbon border border-white/10 flex items-center justify-center font-mono text-xs font-extrabold text-gray-300">R${item.r}</div>
+              <div>
+                <div class="text-xs font-bold text-white">${item.name}</div>
+                <div class="text-[11px] text-gray-400">${item.circuit} • ${item.date}</div>
+              </div>
+            </div>
+            ${badge}
+          </div>
+        `;
+      }).join('');
+    }
+
+    // =========================================================================
+    // 5. LIVE TIMING TOWER & FOCUS DRIVER
+    // =========================================================================
+    function renderTimingTower() {
+      const container = document.getElementById('timing-tower-rows');
+      container.innerHTML = DRIVERS_2026.map((d, idx) => {
+        const isFocused = d.code === state.focusedDriverCode;
+        const tyreColor = d.tyre === 'S' ? 'text-red-400 border-red-500/40 bg-red-500/15'
+                        : d.tyre === 'M' ? 'text-yellow-400 border-yellow-500/40 bg-yellow-500/15'
+                        : 'text-gray-200 border-white/30 bg-white/10';
+
+        const sectorBlocks = d.sectors.map(s => {
+          const c = s === 'P' ? 'bg-f1purple' : s === 'G' ? 'bg-f1green' : 'bg-f1yellow';
+          return `<span class="w-2.5 h-2 rounded-[2px] ${c}"></span>`;
+        }).join('');
+
+        return `
+          <div onclick="selectFocusDriver('${d.code}')" class="grid grid-cols-12 items-center px-2 py-2 cursor-pointer transition ${isFocused ? 'bg-white/10' : 'hover:bg-white/5'}">
+            <div class="col-span-1 font-mono text-xs font-extrabold text-gray-300">${idx + 1}</div>
+            <div class="col-span-4 flex items-center gap-2">
+              <span class="w-1 h-5 rounded-full" style="background:${d.color}"></span>
+              <div>
+                <div class="text-xs font-black font-mono text-white leading-none">${d.code}</div>
+                <div class="text-[9px] text-gray-400 truncate max-w-[85px]">${d.team}</div>
+              </div>
+            </div>
+            <div class="col-span-3 text-right font-mono text-[11px] font-bold ${idx === 0 ? 'text-f1green' : 'text-gray-200'}">${d.gap}</div>
+            <div class="col-span-2 flex justify-center">
+              <span class="text-[9px] font-mono font-extrabold px-1.5 py-0.5 rounded border ${tyreColor}">${d.tyre} ${d.tyreAge}L</span>
+            </div>
+            <div class="col-span-2 flex justify-end gap-0.5">${sectorBlocks}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function selectFocusDriver(code) {
+      state.focusedDriverCode = code;
+      const d = DRIVERS_2026.find(x => x.code === code) || DRIVERS_2026[0];
+      document.getElementById('focus-team-bar').style.backgroundColor = d.color;
+      document.getElementById('focus-driver-code').innerText = d.code;
+      document.getElementById('focus-driver-name').innerText = d.name;
+      document.getElementById('focus-tyre-badge').innerText = `${d.tyre} • ${d.tyreAge}L`;
+      document.getElementById('focus-telemetry-readout').innerText = `${d.speed} KM/H • GEAR ${d.gear} • THR 100% • ERS 84%`;
+      if (state.cameraFollow) {
+        document.getElementById('cam-follow-btn').innerText = `CAM: FOLLOW ${d.code}`;
+      }
+      renderTimingTower();
+    }
+
+    function cycleReplaySpeed() {
+      const speeds = [1, 2, 5];
+      const nextIdx = (speeds.indexOf(state.replaySpeed) + 1) % speeds.length;
+      state.replaySpeed = speeds[nextIdx];
+      document.getElementById('replay-speed-label').innerText = `${state.replaySpeed}x`;
+    }
+
+    function toggleCameraFollow() {
+      state.cameraFollow = !state.cameraFollow;
+      const btn = document.getElementById('cam-follow-btn');
+      btn.innerText = state.cameraFollow ? `CAM: FOLLOW ${state.focusedDriverCode}` : 'CAM: FULL TRACK';
+    }
+
+    // =========================================================================
+    // 6. SKIASHARP-STYLE 60 FPS TRACK MAP & TELEMETRY CANVAS
+    // =========================================================================
+    function getTrackPoint(t, isInterlagos) {
+      const angle = t % (Math.PI * 2);
+      if (!isInterlagos) {
+        const x = 200 + Math.cos(angle) * 145 + Math.sin(angle * 2) * 22;
+        const y = 165 + Math.sin(angle) * 85 - Math.cos(angle * 3) * 18;
+        return { x, y };
+      } else {
+        const x = 200 + Math.cos(angle) * 130 - Math.sin(angle * 2) * 30;
+        const y = 165 + Math.sin(angle) * 95 + Math.cos(angle * 2) * 20;
+        return { x, y };
+      }
+    }
+
+    function renderTrackCanvas() {
+      const canvas = document.getElementById('track-canvas');
+      if (!canvas || state.activeTab !== 'pitwall' || state.pitSubView !== 'track') return;
+      const ctx = canvas.getContext('2d');
+      const isInterlagos = state.activeCircuit === 'interlagos';
+
+      ctx.save();
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Camera Follow Zoom Transformation
+      if (state.cameraFollow) {
+        const focusIdx = DRIVERS_2026.findIndex(d => d.code === state.focusedDriverCode);
+        const fPt = getTrackPoint(state.carAngles[focusIdx >= 0 ? focusIdx : 0], isInterlagos);
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.scale(1.85, 1.85);
+        ctx.translate(-fPt.x, -fPt.y);
+      }
+
+      // Subtle Pit-Wall Grid
+      ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+      ctx.lineWidth = 1;
+      for (let gx = -100; gx < 500; gx += 25) {
+        ctx.beginPath(); ctx.moveTo(gx, -100); ctx.lineTo(gx, 450); ctx.stroke();
+      }
+      for (let gy = -100; gy < 450; gy += 25) {
+        ctx.beginPath(); ctx.moveTo(-100, gy); ctx.lineTo(500, gy); ctx.stroke();
+      }
+
+      // Draw Circuit Asphalt Ribbon
+      ctx.beginPath();
+      for (let i = 0; i <= 120; i++) {
+        const pt = getTrackPoint((i / 120) * Math.PI * 2, isInterlagos);
+        if (i === 0) ctx.moveTo(pt.x, pt.y);
+        else ctx.lineTo(pt.x, pt.y);
+      }
+      ctx.closePath();
+      ctx.strokeStyle = '#2A3142';
+      ctx.lineWidth = 14;
+      ctx.stroke();
+
+      // Inner Racing Line
+      ctx.strokeStyle = '#64748B';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Update & Draw Cars
+      DRIVERS_2026.forEach((d, idx) => {
+        const pt = getTrackPoint(state.carAngles[idx], isInterlagos);
+        const isFocus = d.code === state.focusedDriverCode;
+
+        if (isFocus) {
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, 11, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(225, 6, 0, 0.35)';
+          ctx.fill();
+        }
+
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, isFocus ? 5.5 : 4, 0, Math.PI * 2);
+        ctx.fillStyle = d.color;
+        ctx.fill();
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = isFocus ? 1.5 : 0.8;
+        ctx.stroke();
+
+        if (isFocus || idx < 4) {
+          ctx.font = 'bold 9px JetBrains Mono';
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillText(d.code, pt.x + 8, pt.y + 3);
+        }
+      });
+
+      ctx.restore();
+    }
+
+    function drawTelemetryCharts() {
+      const canvas = document.getElementById('telemetry-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const dA = DRIVERS_2026.find(x => x.code === document.getElementById('h2h-driver-a').value) || DRIVERS_2026[0];
+      const dB = DRIVERS_2026.find(x => x.code === document.getElementById('h2h-driver-b').value) || DRIVERS_2026[1];
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Grid lines
+      ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+      for (let y = 30; y < 260; y += 45) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+      }
+
+      // Speed Trace Driver A
+      ctx.beginPath();
+      for (let x = 0; x <= canvas.width; x += 4) {
+        const y = 75 - Math.sin(x * 0.03) * 42 - Math.cos(x * 0.07) * 14;
+        if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = dA.color;
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      // Speed Trace Driver B
+      ctx.beginPath();
+      for (let x = 0; x <= canvas.width; x += 4) {
+        const y = 78 - Math.sin(x * 0.03 - 0.12) * 40 - Math.cos(x * 0.07) * 14;
+        if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = dB.color;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Throttle Trace
+      ctx.beginPath();
+      for (let x = 0; x <= canvas.width; x += 4) {
+        const thr = Math.sin(x * 0.03) > -0.3 ? 155 : 195;
+        if (x === 0) ctx.moveTo(x, thr); else ctx.lineTo(x, thr);
+      }
+      ctx.strokeStyle = '#22C55E';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Brake Trace
+      ctx.beginPath();
+      for (let x = 0; x <= canvas.width; x += 4) {
+        const brk = Math.sin(x * 0.03) <= -0.3 ? 215 : 250;
+        if (x === 0) ctx.moveTo(x, brk); else ctx.lineTo(x, brk);
+      }
+      ctx.strokeStyle = '#E10600';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Interactive Crosshair Scrubber
+      const scrubPx = state.scrubNormX * canvas.width;
+      ctx.beginPath();
+      ctx.moveTo(scrubPx, 0);
+      ctx.lineTo(scrubPx, canvas.height);
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Update Scrub Readouts
+      const distMeters = Math.round(state.scrubNormX * 6201);
+      const spdA = Math.round(285 + Math.sin(scrubPx * 0.03) * 52);
+      const spdB = Math.round(282 + Math.sin(scrubPx * 0.03 - 0.12) * 50);
+      const isBraking = Math.sin(scrubPx * 0.03) <= -0.3;
+
+      document.getElementById('scrub-dist-label').innerText = `${distMeters.toLocaleString()}m`;
+      document.getElementById('scrub-speed-readout').innerText = `${spdA} vs ${spdB}`;
+      document.getElementById('scrub-throttle-readout').innerText = isBraking ? '12% vs 15%' : '100% vs 98%';
+      document.getElementById('scrub-brake-readout').innerText = isBraking ? '94% vs 88%' : '0% vs 0%';
+
+      ctx.font = 'bold 10px JetBrains Mono';
+      ctx.fillStyle = dA.color;
+      ctx.fillText(`■ ${dA.code} SPD`, 10, 16);
+      ctx.fillStyle = dB.color;
+      ctx.fillText(`-- ${dB.code} SPD`, 95, 16);
+      ctx.fillStyle = '#22C55E';
+      ctx.fillText(`■ THR`, 190, 16);
+      ctx.fillStyle = '#E10600';
+      ctx.fillText(`■ BRK`, 245, 16);
+    }
+
+    function setupTelemetryScrubber() {
+      const canvas = document.getElementById('telemetry-canvas');
+      if (!canvas) return;
+      const updateScrub = (clientX) => {
+        const rect = canvas.getBoundingClientRect();
+        state.scrubNormX = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+        drawTelemetryCharts();
+      };
+      canvas.addEventListener('pointerdown', (e) => { state.isScrubbing = true; updateScrub(e.clientX); });
+      window.addEventListener('pointermove', (e) => { if (state.isScrubbing) updateScrub(e.clientX); });
+      window.addEventListener('pointerup', () => { state.isScrubbing = false; });
+    }
+
+    // =========================================================================
+    // 7. PADDOCK VISUAL DOSSIERS (DRIVERS, HELMETS, CARS, CIRCUITS)
+    // =========================================================================
+    function switchPaddockTab(sub) {
+      ['drivers', 'cars', 'circuits'].forEach(t => {
+        document.getElementById(`paddock-${t}-list`).classList.add('hidden');
+        const btn = document.getElementById(`pad-tab-${t}`);
+        btn.classList.remove('bg-f1red', 'text-white');
+        btn.classList.add('text-gray-400');
+      });
+      document.getElementById(`paddock-${sub}-list`).classList.remove('hidden');
+      const active = document.getElementById(`pad-tab-${sub}`);
+      active.classList.remove('text-gray-400');
+      active.classList.add('bg-f1red', 'text-white');
+    }
+
+    function renderPaddockDrivers() {
+      const container = document.getElementById('paddock-drivers-list');
+      container.innerHTML = DRIVERS_2026.map(d => `
+        <div onclick="openDriverDossier('${d.code}')" class="bg-slatepanel hover:bg-slatecard border border-white/10 rounded-2xl p-3 flex items-center justify-between cursor-pointer transition">
+          <div class="flex items-center gap-3">
+            <img src="${d.portrait}" alt="${d.name}" class="w-12 h-12 rounded-xl object-cover border-2" style="border-color:${d.color}" />
+            <div>
+              <div class="flex items-center gap-1.5">
+                <span class="text-xs font-black font-mono px-1.5 py-0.2 rounded text-white" style="background:${d.color}">#${d.num}</span>
+                <span class="text-sm font-extrabold text-white">${d.name}</span>
+              </div>
+              <div class="text-[11px] text-gray-400">${d.team} • ${d.wins} Wins • ${d.titles}x WDC</div>
+              <div class="text-[10px] font-mono text-amber-400 mt-0.5">🪖 ${d.helmetDesc}</div>
+            </div>
+          </div>
+          <span class="text-gray-400 text-xs font-mono">→</span>
+        </div>
+      `).join('');
+    }
+
+    function renderPaddockCars() {
+      const container = document.getElementById('paddock-cars-list');
+      container.innerHTML = CARS_2026.map(c => `
+        <div class="bg-slatepanel border border-white/10 rounded-2xl overflow-hidden">
+          <div class="relative h-36">
+            <img src="${c.img}" alt="${c.team}" class="w-full h-full object-cover" />
+            <div class="absolute inset-0 bg-gradient-to-t from-slatepanel via-transparent to-transparent"></div>
+            <span class="absolute top-2.5 left-2.5 text-[10px] font-mono font-bold px-2 py-0.5 rounded text-white" style="background:${c.color}">${c.team}</span>
+            <span class="absolute bottom-2 right-2.5 text-[10px] font-mono font-bold bg-black/75 text-f1green px-2 py-0.5 rounded">AVG PIT: ${c.avgPit}</span>
+          </div>
+          <div class="p-3 space-y-1">
+            <div class="text-xs font-black text-white">${c.chassis}</div>
+            <p class="text-[11px] text-gray-400">${c.aeroNote}</p>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderPaddockCircuits() {
+      const container = document.getElementById('paddock-circuits-list');
+      container.innerHTML = CIRCUITS_VAULT.map(c => `
+        <div class="bg-slatepanel border border-white/10 rounded-2xl overflow-hidden">
+          <div class="relative h-36">
+            <img src="${c.img}" alt="${c.name}" class="w-full h-full object-cover" />
+            <div class="absolute inset-0 bg-gradient-to-t from-slatepanel via-black/20 to-transparent"></div>
+            <div class="absolute bottom-2.5 left-3">
+              <div class="text-[10px] font-mono text-f1red font-bold uppercase">${c.country}</div>
+              <div class="text-sm font-black text-white">${c.name}</div>
+            </div>
+            <span class="absolute top-2.5 right-2.5 text-[10px] font-mono font-bold bg-black/75 text-white px-2 py-0.5 rounded">V-MAX ${c.topSpeed}</span>
+          </div>
+          <div class="p-3 space-y-1.5">
+            <div class="text-xs font-bold text-amber-400">📸 Corner Spotlight: ${c.cornerName}</div>
+            <p class="text-[11px] text-gray-300 leading-relaxed">${c.cornerDesc}</p>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function openDriverDossier(code) {
+      const d = DRIVERS_2026.find(x => x.code === code) || DRIVERS_2026[0];
+      document.getElementById('modal-header-tag').innerText = `${d.team.toUpperCase()} • DRIVER & HELMET DOSSIER`;
+      document.getElementById('modal-body-content').innerHTML = `
+        <div class="flex items-center gap-3.5">
+          <img src="${d.portrait}" class="w-20 h-20 rounded-2xl object-cover border-2" style="border-color:${d.color}" />
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-mono font-black px-2 py-0.5 rounded text-white" style="background:${d.color}">#${d.num}</span>
+              <h2 class="text-lg font-black text-white">${d.name}</h2>
+            </div>
+            <p class="text-xs text-gray-400">${d.team}</p>
+            <div class="flex gap-3 mt-2 font-mono text-xs">
+              <div><span class="text-gray-400">WINS:</span> <strong class="text-white">${d.wins}</strong></div>
+              <div><span class="text-gray-400">POLES:</span> <strong class="text-white">${d.poles}</strong></div>
+              <div><span class="text-gray-400">WDC:</span> <strong class="text-amber-400">${d.titles}</strong></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Helmet Gallery Card -->
+        <div class="bg-carbon border border-white/10 rounded-xl p-3 space-y-1.5">
+          <div class="text-[10px] font-mono font-bold text-amber-400 uppercase">🪖 2026 Helmet Livery & Special Edition</div>
+          <div class="text-xs font-bold text-white">${d.helmetDesc}</div>
+          <p class="text-[11px] text-gray-400">Bell HP77 Carbon Shell • Custom FIA 8860-2018 ABP Visor Spec</p>
+        </div>
+
+        <!-- Teammate Head-to-Head -->
+        <div class="bg-carbon border border-white/10 rounded-xl p-3 space-y-2">
+          <div class="text-[10px] font-mono font-bold text-gray-400 uppercase">2026 Teammate Head-to-Head</div>
+          <div class="grid grid-cols-2 gap-2 text-center font-mono">
+            <div class="bg-slatepanel p-2 rounded-lg">
+              <div class="text-[10px] text-gray-400">QUALIFYING DUEL</div>
+              <div class="text-sm font-black text-f1green">${d.h2hQuali}</div>
+            </div>
+            <div class="bg-slatepanel p-2 rounded-lg">
+              <div class="text-[10px] text-gray-400">RACE FINISH DUEL</div>
+              <div class="text-sm font-black text-white">${d.h2hRace}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2026 Power Unit Allocation Tracker -->
+        <div class="bg-carbon border border-white/10 rounded-xl p-3 space-y-2">
+          <div class="text-[10px] font-mono font-bold text-gray-400 uppercase">2026 Power Unit Component Allocation</div>
+          <div class="grid grid-cols-4 gap-1.5 font-mono text-center text-[11px]">
+            <div class="bg-slatepanel p-2 rounded-lg"><div class="text-[9px] text-gray-400">ICE</div><div class="font-bold text-white">${d.puStatus.ICE}</div></div>
+            <div class="bg-slatepanel p-2 rounded-lg"><div class="text-[9px] text-gray-400">TURBO</div><div class="font-bold text-white">${d.puStatus.TC}</div></div>
+            <div class="bg-slatepanel p-2 rounded-lg"><div class="text-[9px] text-gray-400">MGU-K</div><div class="font-bold text-f1green">${d.puStatus.MGU_K}</div></div>
+            <div class="bg-slatepanel p-2 rounded-lg"><div class="text-[9px] text-gray-400">BATTERY</div><div class="font-bold text-amber-400">${d.puStatus.ES}</div></div>
+          </div>
+        </div>
+      `;
+      document.getElementById('dossier-modal').classList.remove('hidden');
+    }
+
+    function openArticleModal(articleId) {
+      const article = NEWS_ARTICLES.find(a => a.id === articleId);
+      if (!article) return;
+      document.getElementById('modal-header-tag').innerText = `${article.source} • ${article.tag}`;
+      document.getElementById('modal-body-content').innerHTML = `
+        <div class="space-y-3">
+          <div class="text-[10px] font-mono text-gray-400">${article.time}</div>
+          <h2 class="text-base font-black text-white leading-snug">${article.title}</h2>
+          <div class="bg-carbon border border-white/10 rounded-xl p-3 text-xs text-gray-300 leading-relaxed space-y-2">
+            <p>${article.body}</p>
+          </div>
+        </div>
+      `;
+      document.getElementById('dossier-modal').classList.remove('hidden');
+    }
+
+    function closeDossierModal() {
+      document.getElementById('dossier-modal').classList.add('hidden');
+    }
+
+    // =========================================================================
+    // 8. HISTORICAL ARCHIVE, ALL RACES (1950-2026), RECORDS & F1 FACTS
+    // =========================================================================
+    function switchArchiveSubTab(sub) {
+      state.archiveSubTab = sub;
+      ['races', 'records', 'facts', 'worm'].forEach(t => {
+        document.getElementById(`archive-sub-${t}`).classList.add('hidden');
+        const btn = document.getElementById(`arch-tab-${t}`);
+        btn.classList.remove('bg-f1red', 'text-white');
+        btn.classList.add('text-gray-400');
+      });
+      document.getElementById(`archive-sub-${sub}`).classList.remove('hidden');
+      const active = document.getElementById(`arch-tab-${sub}`);
+      active.classList.remove('text-gray-400');
+      active.classList.add('bg-f1red', 'text-white');
+
+      if (sub === 'worm') drawWormChart();
+    }
+
+    function renderDecadePills() {
+      const decades = ['ALL', '1950s', '1960s', '1970s', '1980s', '1990s', '2000s', '2010s', '2020s'];
+      document.getElementById('archive-decade-pills').innerHTML = decades.map(dec => {
+        const active = state.selectedDecade === dec;
+        return `<button onclick="selectArchiveDecade('${dec}')" class="shrink-0 px-2.5 py-1 rounded-lg border transition ${active ? 'bg-f1red border-f1red text-white' : 'bg-carbon border-white/10 text-gray-400 hover:text-white'}">${dec === 'ALL' ? 'ALL ERAS' : dec}</button>`;
+      }).join('');
+    }
+
+    function selectArchiveDecade(dec) {
+      state.selectedDecade = dec;
+      renderDecadePills();
+      renderAllRacesVault();
+    }
+
+    function renderAllRacesVault() {
+      const query = (document.getElementById('archive-race-search')?.value || '').toLowerCase().trim();
+      const filtered = ALL_RACES_ARCHIVE.filter(r => {
+        const matchesDecade = state.selectedDecade === 'ALL' || r.decade === state.selectedDecade;
+        const matchesQuery = !query ||
+          r.gp.toLowerCase().includes(query) ||
+          r.circuit.toLowerCase().includes(query) ||
+          r.country.toLowerCase().includes(query) ||
+          r.winner.toLowerCase().includes(query) ||
+          String(r.year).includes(query);
+        return matchesDecade && matchesQuery;
+      });
+
+      const container = document.getElementById('archive-races-list');
+      if (filtered.length === 0) {
+        container.innerHTML = `<div class="bg-slatepanel border border-white/10 rounded-xl p-4 text-center text-xs text-gray-400 font-mono">No matching Grands Prix found in vault.</div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(r => `
+        <div onclick="openHistoricRaceModal(${r.id})" class="bg-slatepanel hover:bg-slatecard border border-white/10 rounded-xl p-3 cursor-pointer transition space-y-1.5">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] font-mono font-extrabold px-1.5 py-0.5 rounded bg-f1red/20 text-f1red border border-f1red/30">${r.year}</span>
+              <span class="text-[10px] font-mono text-gray-400">RACE #${r.raceNum}</span>
+            </div>
+            <span class="text-[10px] font-mono font-bold text-f1green">🏆 ${r.winner}</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-xs font-extrabold text-white">${r.gp}</div>
+              <div class="text-[11px] text-gray-400">${r.circuit} • ${r.country}</div>
+            </div>
+            <span class="text-xs font-mono text-gray-400">DOSSIER →</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function openHistoricRaceModal(raceId) {
+      const r = ALL_RACES_ARCHIVE.find(x => x.id === raceId);
+      if (!r) return;
+      document.getElementById('modal-header-tag').innerText = `RACE #${r.raceNum} • ${r.year} WORLD CHAMPIONSHIP ARCHIVE`;
+      document.getElementById('modal-body-content').innerHTML = `
+        <div class="space-y-3">
+          <div>
+            <div class="text-[10px] font-mono font-bold text-f1red uppercase">${r.decade} ERA • ${r.country}</div>
+            <h2 class="text-lg font-black text-white">${r.year} ${r.gp}</h2>
+            <p class="text-xs text-gray-400">${r.circuit} • ${r.laps} Laps • ${r.length}</p>
+          </div>
+
+          <!-- Podium Box -->
+          <div class="bg-carbon border border-white/10 rounded-xl p-3 space-y-2 font-mono text-xs">
+            <div class="text-[10px] text-gray-400 uppercase font-bold">Official Race Podium</div>
+            <div class="flex justify-between items-center bg-slatepanel p-2 rounded-lg border-l-4 border-amber-400">
+              <span class="font-black text-white">1ST • ${r.winner}</span>
+              <span class="text-[10px] text-gray-400">${r.team}</span>
+            </div>
+            <div class="flex justify-between items-center bg-slatepanel p-2 rounded-lg border-l-4 border-gray-300">
+              <span class="font-bold text-gray-200">2ND • ${r.p2}</span>
+            </div>
+            <div class="flex justify-between items-center bg-slatepanel p-2 rounded-lg border-l-4 border-amber-700">
+              <span class="font-bold text-gray-300">3RD • ${r.p3}</span>
+            </div>
+          </div>
+
+          <!-- Pole & Fastest Lap -->
+          <div class="grid grid-cols-2 gap-2 font-mono text-[11px]">
+            <div class="bg-carbon border border-white/10 rounded-xl p-2.5">
+              <div class="text-[9px] text-gray-400">POLE POSITION</div>
+              <div class="font-bold text-white mt-0.5">${r.pole}</div>
+            </div>
+            <div class="bg-carbon border border-white/10 rounded-xl p-2.5">
+              <div class="text-[9px] text-f1purple">FASTEST LAP</div>
+              <div class="font-bold text-white mt-0.5">${r.fastestLap}</div>
+            </div>
+          </div>
+
+          <!-- Historical Race Story -->
+          <div class="bg-carbon border border-white/10 rounded-xl p-3 space-y-1">
+            <div class="text-[10px] font-mono font-bold text-amber-400 uppercase">📖 Historical Race Story & Significance</div>
+            <p class="text-xs text-gray-300 leading-relaxed">${r.story}</p>
+          </div>
+        </div>
+      `;
+      document.getElementById('dossier-modal').classList.remove('hidden');
+    }
+
+    function switchRecordCategory(cat) {
+      state.recordCategory = cat;
+      ['drivers', 'constructors', 'circuits'].forEach(c => {
+        const btn = document.getElementById(`rec-cat-${c}`);
+        btn.classList.remove('bg-f1red', 'text-white');
+        btn.classList.add('text-gray-400');
+      });
+      const active = document.getElementById(`rec-cat-${cat}`);
+      active.classList.remove('text-gray-400');
+      active.classList.add('bg-f1red', 'text-white');
+
+      document.getElementById('archive-legends-box').classList.toggle('hidden', cat !== 'drivers');
+      renderAllTimeRecords();
+    }
+
+    function renderAllTimeRecords() {
+      const list = ALL_TIME_RECORDS[state.recordCategory] || [];
+      document.getElementById('archive-records-cards').innerHTML = list.map(rec => `
+        <div class="bg-carbon border border-white/10 rounded-xl p-3 flex items-center justify-between gap-2">
+          <div>
+            <div class="text-[10px] font-mono text-gray-400 uppercase">${rec.title}</div>
+            <div class="text-xs font-extrabold text-white mt-0.5">${rec.holder}</div>
+            <div class="text-[10px] text-gray-400 mt-0.5">${rec.detail}</div>
+          </div>
+          <div class="shrink-0 bg-f1red/15 border border-f1red/30 text-f1red font-mono font-black text-xs px-2.5 py-1.5 rounded-lg">
+            ${rec.value}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function nextSpotlightFact() {
+      state.spotlightFactIndex = (state.spotlightFactIndex + 1) % F1_FACTS_DECK.length;
+      const fact = F1_FACTS_DECK[state.spotlightFactIndex];
+      document.getElementById('spotlight-fact-cat').innerText = fact.cat;
+      document.getElementById('spotlight-fact-index').innerText = `FACT #${state.spotlightFactIndex + 1} OF ${F1_FACTS_DECK.length}`;
+      document.getElementById('spotlight-fact-title').innerText = fact.title;
+      document.getElementById('spotlight-fact-body').innerText = fact.body;
+    }
+
+    function renderF1FactsDeck() {
+      document.getElementById('archive-facts-list').innerHTML = F1_FACTS_DECK.map((f, idx) => `
+        <div class="bg-slatepanel border border-white/10 rounded-xl p-3 space-y-1">
+          <div class="flex items-center justify-between text-[10px] font-mono">
+            <span class="text-amber-400 font-bold">${f.cat}</span>
+            <span class="text-gray-500">#${idx + 1}</span>
+          </div>
+          <div class="text-xs font-extrabold text-white">${f.title}</div>
+          <p class="text-[11px] text-gray-400 leading-relaxed">${f.body}</p>
+        </div>
+      `).join('');
+    }
+
+    function togglePointsNormalizer() {
+      state.pointsNormalized = !state.pointsNormalized;
+      const btn = document.getElementById('normalizer-btn');
+      btn.innerText = state.pointsNormalized ? '2026 PTS NORM: ON' : '2026 PTS NORM: OFF';
+      renderArchiveLegends();
+    }
+
+    function renderArchiveLegends() {
+      const legends = [
+        { name: "Lewis Hamilton", era: "2007–2026", wins: 106, rawPts: 4912, normPts: 5140 },
+        { name: "Michael Schumacher", era: "1991–2012", wins: 91, rawPts: 1566, normPts: 3890 },
+        { name: "Max Verstappen", era: "2015–2026", wins: 66, rawPts: 3120, normPts: 3120 },
+        { name: "Ayrton Senna", era: "1984–1994", wins: 41, rawPts: 614, normPts: 1895 }
+      ];
+
+      document.getElementById('archive-legends-list').innerHTML = legends.map(l => `
+        <div class="bg-carbon border border-white/5 rounded-xl p-2.5 flex items-center justify-between">
+          <div>
+            <div class="text-xs font-extrabold text-white">${l.name}</div>
+            <div class="text-[10px] font-mono text-gray-400">${l.era} • ${l.wins} GP Wins</div>
+          </div>
+          <div class="text-right font-mono">
+            <div class="text-xs font-black text-f1green">${state.pointsNormalized ? l.normPts : l.rawPts} PTS</div>
+            <div class="text-[9px] text-gray-400">${state.pointsNormalized ? '2026 SYSTEM' : 'ERA ACTUAL'}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function drawWormChart() {
+      const canvas = document.getElementById('worm-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const traces = [
+        { label: 'VER', color: '#3671C6', pts: [45, 40, 35, 25, 20, 18, 18] },
+        { label: 'NOR', color: '#FF8000', pts: [22, 22, 25, 38, 35, 34, 34] },
+        { label: 'LEC', color: '#E8002D', pts: [65, 60, 58, 55, 52, 52, 52] }
+      ];
+
+      traces.forEach(t => {
+        ctx.beginPath();
+        t.pts.forEach((y, i) => {
+          const x = 15 + i * 54;
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.strokeStyle = t.color;
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        const lastY = t.pts[t.pts.length - 1];
+        ctx.font = 'bold 9px JetBrains Mono';
+        ctx.fillStyle = t.color;
+        ctx.fillText(t.label, 346, lastY + 3);
+      });
+    }
+
+    // =========================================================================
+    // 9. TEAM RADIO SCANNER (WEB AUDIO API) & OPEN-SOURCE RSS NEWS
+    // =========================================================================
+    function playPitRadioBeep() {
+      try {
+        if (!state.audioCtx) {
+          state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (state.audioCtx.state === 'suspended') {
+          state.audioCtx.resume();
+        }
+        const now = state.audioCtx.currentTime;
+        const osc = state.audioCtx.createOscillator();
+        const gain = state.audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1180, now);
+        osc.frequency.setValueAtTime(1480, now + 0.07);
+        gain.gain.setValueAtTime(0.05, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+        osc.connect(gain);
+        gain.connect(state.audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.16);
+      } catch (e) {}
+    }
+
+    function renderRadioClips() {
+      document.getElementById('radio-clips-list').innerHTML = RADIO_CLIPS.map(r => {
+        const isPlaying = state.playingRadioId === r.id;
+        return `
+          <div onclick="toggleRadioPlay(${r.id})" class="bg-carbon border ${isPlaying ? 'border-f1red' : 'border-white/10'} rounded-xl p-2.5 cursor-pointer transition">
+            <div class="flex items-center justify-between mb-1">
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] font-mono font-black px-1.5 py-0.2 rounded text-white" style="background:${r.teamColor}">${r.driver}</span>
+                <span class="text-[10px] font-mono text-gray-400">${r.lap}</span>
+              </div>
+              <div class="flex items-end gap-0.5 h-3 ${isPlaying ? 'eq-active' : ''}">
+                <span class="bar-1 w-0.5 bg-f1red h-1.5"></span>
+                <span class="bar-2 w-0.5 bg-f1red h-2.5"></span>
+                <span class="bar-3 w-0.5 bg-f1red h-2"></span>
+                <span class="bar-4 w-0.5 bg-f1red h-3"></span>
+                <span class="bar-5 w-0.5 bg-f1red h-1.5"></span>
+              </div>
+            </div>
+            <p class="text-[11px] font-mono text-gray-200 italic">"${r.text}"</p>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function toggleRadioPlay(id) {
+      state.playingRadioId = state.playingRadioId === id ? null : id;
+      if (state.playingRadioId !== null) {
+        playPitRadioBeep();
+      }
+      renderRadioClips();
+    }
+
+    function renderNewsFeed() {
+      document.getElementById('news-feed-list').innerHTML = NEWS_ARTICLES.map(n => `
+        <div onclick="openArticleModal(${n.id})" class="bg-slatepanel hover:bg-slatecard border border-white/10 rounded-xl p-3 space-y-1 cursor-pointer transition">
+          <div class="flex justify-between items-center text-[10px] font-mono">
+            <span class="text-f1red font-bold">${n.source}</span>
+            <span class="text-gray-400">${n.time}</span>
+          </div>
+          <h4 class="text-xs font-bold text-white leading-snug">${n.title}</h4>
+          <p class="text-[11px] text-gray-400 leading-relaxed">${n.summary}</p>
+        </div>
+      `).join('');
+    }
+
+    // =========================================================================
+    // 10. 60 FPS REAL-TIME TELEMETRY & HUD LOOP
+    // =========================================================================
+    function startLiveSimulationLoop() {
+      let frame = 0;
+      let currentLap = 38;
+      function tick() {
+        frame++;
+        DRIVERS_2026.forEach((d, idx) => {
+          state.carAngles[idx] += (0.012 - idx * 0.00012) * state.replaySpeed;
+        });
+
+        renderTrackCanvas();
+
+        if (frame % 25 === 0) {
+          const baseSpeed = 328 + Math.floor(Math.random() * 16);
+          const hudSpeed = document.getElementById('hud-speed');
+          if (hudSpeed) hudSpeed.innerText = baseSpeed;
+
+          const focused = DRIVERS_2026.find(d => d.code === state.focusedDriverCode);
+          if (focused) {
+            focused.speed = baseSpeed;
+            document.getElementById('focus-telemetry-readout').innerText = `${baseSpeed} KM/H • GEAR 8 • THR 100% • ERS 84%`;
+          }
+        }
+
+        if (frame % (360 / state.replaySpeed) === 0 && state.activeCircuit === 'vegas') {
+          currentLap = currentLap >= 50 ? 38 : currentLap + 1;
+          const lapEl = document.getElementById('header-lap-num');
+          if (lapEl) lapEl.innerText = currentLap;
+        }
+
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    }
+
+    window.onload = initApp;
+  </script>
+</body>
+</html>

@@ -107,6 +107,10 @@ public sealed class ResultsPage : ContentPage
 
     private View BuildContent()
     {
+        // The palette swap rebuilds this page; a control created in the constructor still has its old
+        // parent, and MAUI refuses to add it twice.
+        (_picker.Parent as Layout)?.Remove(_picker);
+
         var header = new VerticalStackLayout
         {
             Padding = new Thickness(Tokens.Space4, Tokens.Space3),
@@ -121,12 +125,7 @@ public sealed class ResultsPage : ContentPage
                 }, Label.TextProperty, nameof(ResultsViewModel.Headline)),
                 _picker,
                 _replayButton,
-                Bind(new Label
-                {
-                    FontSize = Tokens.FontCaption,
-                    FontFamily = Tokens.MonoFont,
-                    TextColor = Themes.Current.TextSecondary,
-                }, Label.TextProperty, nameof(ResultsViewModel.Status)),
+                Surfaces.StatusBar(_viewModel, nameof(ResultsViewModel.Status), nameof(ResultsViewModel.IsBusy)),
             },
         };
 

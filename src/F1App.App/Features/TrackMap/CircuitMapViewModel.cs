@@ -7,6 +7,7 @@ using F1App.Services;
 using F1App.Telemetry.Circuits;
 using F1App.Telemetry.Facts;
 using F1App.Telemetry.Providers;
+using F1App.Telemetry.Media;
 using F1App.Telemetry.Replay;
 
 namespace F1App.Features.TrackMap;
@@ -22,6 +23,8 @@ public sealed partial class CircuitMapViewModel : ObservableObject
     private readonly JolpicaCircuitWinners _winners;
     private readonly JolpicaClient _calendar;
     private readonly SessionRunner _runner;
+    private readonly WikimediaImageClient _images;
+    private readonly SqliteMediaCache _media;
     private readonly TimeProvider _timeProvider;
     private ImmutableArray<CircuitEntry> _entries = [];
 
@@ -31,6 +34,8 @@ public sealed partial class CircuitMapViewModel : ObservableObject
         JolpicaCircuitWinners winners,
         JolpicaClient calendar,
         SessionRunner runner,
+        WikimediaImageClient images,
+        SqliteMediaCache media,
         TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(catalogue);
@@ -45,17 +50,44 @@ public sealed partial class CircuitMapViewModel : ObservableObject
         _winners = winners;
         _calendar = calendar;
         _runner = runner;
+        _images = images;
+        _media = media;
         _timeProvider = timeProvider;
 
         Headline = "circuits";
         Facts = string.Empty;
         Winners = string.Empty;
+        PhotoUrl = null;
+        PhotoCaption = string.Empty;
+        TrackIconUrl = null;
+        CountryFlagUrl = null;
+        ImageCredit = string.Empty;
         Status = "loading the season";
         SelectedIndex = -1;
     }
 
     /// <summary>Circuit labels for the picker.</summary>
     public ObservableCollection<string> Circuits { get; } = [];
+
+    /// <summary>The provider's own track-layout icon for this circuit, when it publishes one.</summary>
+    [ObservableProperty]
+    public partial string? TrackIconUrl { get; set; }
+
+    /// <summary>Attribution for the provider's artwork, empty when none is shown.</summary>
+    [ObservableProperty]
+    public partial string ImageCredit { get; set; }
+
+    /// <summary>The provider's country flag for this meeting.</summary>
+    [ObservableProperty]
+    public partial string? CountryFlagUrl { get; set; }
+
+    /// <summary>Freely licensed aerial photo of the circuit, or <see langword="null"/> when there is none.</summary>
+    [ObservableProperty]
+    public partial string? PhotoUrl { get; set; }
+
+    /// <summary>File title, author and licence - a condition of the licence, not a nicety.</summary>
+    [ObservableProperty]
+    public partial string PhotoCaption { get; set; }
 
     /// <summary>Geometry of the selected circuit, or <see langword="null"/> while none is loaded.</summary>
     [ObservableProperty]
@@ -156,17 +188,27 @@ public sealed partial class CircuitMapViewModel : ObservableObject
                     Outline = outline;
                     IsReplayCircuit = entry.RaceSessionKey == _runner.SessionKey;
                     Facts =
-                        $"{entry.Circuit.Name}, {entry.Circuit.Country} · " +
-                        $"{outline.LapLengthMeters / 1000d:F2} km measured · " +
-                        $"{outline.Points.Length} GPS points · " +
-                        $"{entry.SessionCount} sessions · " +
-                        $"race {entry.RaceStart.ToLocalTime():ddd dd MMM HH:mm}";
+                        $"{entry.Circuit.Name}, {entry.Circuit.Country}" +
+                        (string.IsNullOrWhiteSpace(entry.CircuitType) ? string.Empty : $" ({entry.CircuitType})") +
+                        $" · {outline.LapLengthMeters / 1000d:F2} km measured" +
+                        $" · {outline.Points.Length} GPS points" +
+                        $" · {entry.SessionCount} sessions" +
+                        $" · race {entry.RaceStart.ToLocalTime():ddd dd MMM HH:mm}";
+
+                    TrackIconUrl = entry.CircuitImage;
+                    CountryFlagUrl = entry.CountryFlag;
+
+                    // The provider's artwork is Formula 1's, not a free licence; the screen says whose it is.
+                    ImageCredit = entry.CircuitImage is null && entry.CountryFlag is null
+                        ? string.Empty
+                        : "track icon and flag: Formula 1 media, via OpenF1";
                     Status = IsReplayCircuit
                         ? "geometry from recorded GPS · markers follow the replay"
                         : "geometry from recorded GPS; no hand-drawn map";
                     IsBusy = false;
 
                     await LoadWinnersAsync(entry, cancellationToken).ConfigureAwait(true);
+                    await LoadPhotoAsync(entry, cancellationToken).ConfigureAwait(true);
                     return;
 
                 case RateLimited limited:
@@ -212,6 +254,70 @@ public sealed partial class CircuitMapViewModel : ObservableObject
         Headline = string.Create(
             CultureInfo.InvariantCulture,
             $"{year} season · {entries.Length} circuits · {unmatched} not in the Jolpica calendar");
+    }
+
+    /// <summary>
+    /// Fetches a circuit photo from Commons, cached per circuit so a second visit costs nothing.
+    /// </summary>
+    /// <remarks>
+    /// The photo is an extra, never a requirement: every failure path leaves <see cref="PhotoUrl"/> null and
+    /// the screen simply has no picture. Commons is searched by circuit name, which is what its files are
+    /// titled with; "aerial" is added because a photo of the grandstand is not an encyclopedia entry.
+    /// </remarks>
+    private async Task LoadPhotoAsync(CircuitEntry entry, CancellationToken cancellationToken)
+    {
+        PhotoUrl = null;
+        PhotoCaption = string.Empty;
+        TrackIconUrl = null;
+        CountryFlagUrl = null;
+        ImageCredit = string.Empty;
+
+        var subject = $"circuit:{entry.Circuit.Name}";
+
+        var cached = await _media.ReadAsync(subject, cancellationToken).ConfigureAwait(true);
+
+        if (cached is not null)
+        {
+            ApplyPhoto(cached);
+            return;
+        }
+
+        var found = await _images
+            .FindAsync($"{entry.Circuit.Name} circuit aerial", cancellationToken)
+            .ConfigureAwait(true);
+
+        switch (found)
+        {
+            case OpenImage image:
+                await _media.WriteAsync(subject, image, _timeProvider.GetUtcNow(), cancellationToken)
+                    .ConfigureAwait(true);
+                ApplyPhoto(image);
+                break;
+
+            case HttpFailure:
+                // Remembered as absent, so a circuit Commons has no photo of is not looked up twice.
+                await _media.WriteAsync(subject, null, _timeProvider.GetUtcNow(), cancellationToken)
+                    .ConfigureAwait(true);
+                break;
+
+            case RateLimited:
+                break;
+        }
+    }
+
+    private void ApplyPhoto(OpenImage image)
+    {
+        if (image == SqliteMediaCache.Empty || string.IsNullOrEmpty(image.PreviewUrl))
+        {
+            PhotoUrl = null;
+            PhotoCaption = string.Empty;
+            return;
+        }
+
+        PhotoUrl = image.PreviewUrl;
+        PhotoCaption = string.Create(
+            CultureInfo.InvariantCulture,
+            $"{image.Title} · {image.Artist} · {image.Licence} · Wikimedia Commons");
     }
 
     private async Task LoadWinnersAsync(CircuitEntry entry, CancellationToken cancellationToken)

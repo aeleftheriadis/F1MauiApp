@@ -116,7 +116,8 @@ public sealed class OpenF1ReplayLoader
                 driver.Acronym ?? driver.DriverNumber.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 driver.FullName ?? driver.Acronym ?? "Unknown driver",
                 driver.TeamName ?? "Unknown team",
-                string.IsNullOrEmpty(driver.TeamColour) ? "#94A3B8" : $"#{driver.TeamColour}"))
+                string.IsNullOrEmpty(driver.TeamColour) ? "#94A3B8" : $"#{driver.TeamColour}",
+                string.IsNullOrWhiteSpace(driver.HeadshotUrl) ? null : driver.HeadshotUrl))
             .ToImmutableArray();
 
         return new ReplaySession(sessionKey, label, from, from + duration, outline, samples, identities);

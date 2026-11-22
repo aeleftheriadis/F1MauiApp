@@ -15,6 +15,32 @@ public sealed record OpenF1Session(
     [property: JsonPropertyName("date_start")] DateTimeOffset? DateStart,
     [property: JsonPropertyName("date_end")] DateTimeOffset? DateEnd);
 
+/// <summary>A meeting (Grand Prix weekend) from the OpenF1 <c>/meetings</c> endpoint.</summary>
+/// <remarks>
+/// Carries the two images the provider publishes for a circuit: the official track-layout icon and the
+/// country flag, both on Formula 1's media host.
+/// </remarks>
+public sealed record OpenF1Meeting(
+    [property: JsonPropertyName("meeting_key")] int MeetingKey,
+    [property: JsonPropertyName("meeting_name")] string? MeetingName,
+    [property: JsonPropertyName("circuit_short_name")] string? CircuitShortName,
+    [property: JsonPropertyName("circuit_type")] string? CircuitType,
+    [property: JsonPropertyName("circuit_image")] string? CircuitImage,
+    [property: JsonPropertyName("country_name")] string? CountryName,
+    [property: JsonPropertyName("country_flag")] string? CountryFlag,
+    [property: JsonPropertyName("location")] string? Location,
+    [property: JsonPropertyName("gmt_offset")] string? GmtOffset);
+
+/// <summary>Conditions over the track from the OpenF1 <c>/weather</c> endpoint, sampled about once a minute.</summary>
+public sealed record OpenF1Weather(
+    [property: JsonPropertyName("date")] DateTimeOffset? Date,
+    [property: JsonPropertyName("air_temperature")] double? AirTemperature,
+    [property: JsonPropertyName("track_temperature")] double? TrackTemperature,
+    [property: JsonPropertyName("humidity")] double? Humidity,
+    [property: JsonPropertyName("rainfall")] int? Rainfall,
+    [property: JsonPropertyName("wind_speed")] double? WindSpeed,
+    [property: JsonPropertyName("wind_direction")] int? WindDirection);
+
 /// <summary>A car telemetry message from the OpenF1 <c>/car_data</c> endpoint.</summary>
 public sealed record OpenF1CarData(
     [property: JsonPropertyName("driver_number")] int DriverNumber,
@@ -46,4 +72,6 @@ public sealed record OpenF1Location(
 [JsonSerializable(typeof(List<OpenF1Stint>))]
 [JsonSerializable(typeof(List<OpenF1PitStop>))]
 [JsonSerializable(typeof(List<OpenF1Driver>))]
+[JsonSerializable(typeof(List<OpenF1Meeting>))]
+[JsonSerializable(typeof(List<OpenF1Weather>))]
 public sealed partial class OpenF1JsonContext : JsonSerializerContext;

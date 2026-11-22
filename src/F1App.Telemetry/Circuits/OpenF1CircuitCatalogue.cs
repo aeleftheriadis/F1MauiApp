@@ -5,13 +5,25 @@ using F1App.Telemetry.Providers;
 namespace F1App.Telemetry.Circuits;
 
 /// <summary>One race meeting of a season, with the session that can trace its circuit.</summary>
+/// <param name="Circuit">Circuit identity, from the race session.</param>
+/// <param name="MeetingKey">OpenF1 meeting key.</param>
+/// <param name="RaceSessionKey">Session whose data traces the outline.</param>
+/// <param name="RaceStart">Scheduled race start, UTC.</param>
+/// <param name="SessionCount">Sessions published for the meeting.</param>
+/// <param name="HasRaceSession">False for a calendar placeholder with no race yet.</param>
+/// <param name="CircuitImage">Provider's track-layout icon, when published.</param>
+/// <param name="CountryFlag">Provider's country flag, when published.</param>
+/// <param name="CircuitType">"Permanent", "Temporary - Street" or "Temporary - Road".</param>
 public sealed record CircuitEntry(
     Circuit Circuit,
     int MeetingKey,
     int RaceSessionKey,
     DateTimeOffset RaceStart,
     int SessionCount,
-    bool HasRaceSession);
+    bool HasRaceSession,
+    string? CircuitImage = null,
+    string? CountryFlag = null,
+    string? CircuitType = null);
 
 /// <summary>
 /// Builds the season's circuit list from the published timetable.
@@ -42,6 +54,14 @@ public sealed class OpenF1CircuitCatalogue
 
         var rows = await _client.GetSeasonSessionsAsync(year, cancellationToken).ConfigureAwait(false);
 
+        // One extra request for the whole season brings the images and the circuit type. It is best
+        // effort: a screen that draws circuits must not fail because a picture did not arrive.
+        var meetingsResult = await _client.GetMeetingsAsync(year, cancellationToken).ConfigureAwait(false);
+        var meetingsByKey = meetingsResult is ImmutableArray<OpenF1Meeting> meetings
+            ? meetings.GroupBy(static meeting => meeting.MeetingKey)
+                .ToDictionary(static group => group.Key, static group => group.First())
+            : [];
+
         if (rows is not ImmutableArray<OpenF1Session> sessions || sessions.Length == 0)
         {
             // An empty season is a legitimate answer: the next calendar is published months ahead, and
@@ -69,13 +89,18 @@ public sealed class OpenF1CircuitCatalogue
                 race.Location,
                 race.CountryName);
 
+            meetingsByKey.TryGetValue(meeting.Key, out var meetingRow);
+
             builder.Add(new CircuitEntry(
                 circuit,
                 meeting.Key,
                 race.SessionKey,
                 race.DateStart!.Value,
                 ordered.Length,
-                HasRaceSession: race.SessionName is "Race"));
+                HasRaceSession: race.SessionName is "Race",
+                CircuitImage: meetingRow?.CircuitImage,
+                CountryFlag: meetingRow?.CountryFlag,
+                CircuitType: meetingRow?.CircuitType));
         }
 
         // A testing meeting sits at the same circuit as its race, so key by circuit and keep the

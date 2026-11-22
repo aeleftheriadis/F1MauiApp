@@ -1,5 +1,7 @@
 using F1App.Domain;
+using F1App.Features.Archive;
 using F1App.Features.Facts;
+using F1App.Features.More;
 using F1App.Features.News;
 using F1App.Features.PitWall;
 using F1App.Features.Paddock;
@@ -54,8 +56,8 @@ public static class MauiProgram
         {
             var http = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
 
-            // Reddit's feed answers 429 to anything that is not browser-shaped; the rest of the feeds
-            // do not care. One header, applied once, for all of them.
+            // Some publishers 403 a non-browser agent; the rest do not care. One header, applied once,
+            // for all of them.
             http.DefaultRequestHeaders.UserAgent.ParseAdd(
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) f1telemetry/0.1");
             return http;
@@ -64,7 +66,12 @@ public static class MauiProgram
         builder.Services.AddSingleton(sp => new OpenF1Client(sp.GetRequiredService<HttpClient>(), openF1Gate));
         builder.Services.AddSingleton(sp => new JolpicaClient(sp.GetRequiredService<HttpClient>(), jolpicaGate));
         builder.Services.AddSingleton(sp => new JolpicaFactsClient(sp.GetRequiredService<HttpClient>(), factsGate));
+        // The vault costs one request per season since 1950 and syncs once, so it shares the facts budget.
+        builder.Services.AddSingleton(sp => new JolpicaRaceVaultClient(sp.GetRequiredService<HttpClient>(), factsGate));
+        builder.Services.AddSingleton(sp => new JolpicaSeasonResultsClient(sp.GetRequiredService<HttpClient>(), factsGate));
         builder.Services.AddSingleton<ChampionsService>();
+        builder.Services.AddSingleton<RaceVaultService>();
+        builder.Services.AddSingleton<TeammateDuelService>();
 
         var databasePath = Path.Combine(FileSystem.AppDataDirectory, "f1app.db");
 
@@ -122,6 +129,9 @@ public static class MauiProgram
         builder.Services.AddSingleton<PitWallPage>();
         builder.Services.AddSingleton<SeasonHubViewModel>();
         builder.Services.AddSingleton<SeasonHubPage>();
+        builder.Services.AddSingleton<ArchiveViewModel>();
+        builder.Services.AddSingleton<ArchivePage>();
+        builder.Services.AddSingleton<MorePage>();
         // Commons asks clients to be conservative: its own bucket, two at a time, not the F1 providers' gates.
         var commonsGate = RequestGate.ForRequestsPerMinute(30, TimeProvider.System, burst: 2);
         builder.Services.AddSingleton(sp => new WikimediaImageClient(
@@ -132,8 +142,7 @@ public static class MauiProgram
         builder.Services.AddTransient<PaddockViewModel>();
         builder.Services.AddTransient<PaddockPage>();
 
-        // The shell needs a factory so a tab builds its page on first navigation, not at start-up.
-        builder.Services.AddSingleton<Func<PaddockPage>>(sp => () => sp.GetRequiredService<PaddockPage>());
+
 
         // File logging first: an exception the user sees on screen must leave a trace behind.
         builder.Logging.AddProvider(Diagnostics.Initialize(FileSystem.AppDataDirectory));

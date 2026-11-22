@@ -47,14 +47,12 @@ public sealed class NewsPage : ContentPage
             }
         };
 
-        var status = new Label
-        {
-            FontSize = Tokens.FontCaption,
-            FontFamily = Tokens.MonoFont,
-            TextColor = Themes.Current.TextSecondary,
-            Padding = new Thickness(Tokens.Space4, Tokens.Space2),
-        };
-        status.SetBinding(Label.TextProperty, nameof(NewsViewModel.Status));
+        var status = Surfaces.StatusBar(_viewModel, nameof(NewsViewModel.Status), nameof(NewsViewModel.IsBusy));
+
+        // Pull-to-refresh is the gesture every platform's list has; the toolbar item stays for keyboard users.
+        var refresh = new RefreshView { Content = _list! };
+        refresh.SetBinding(RefreshView.IsRefreshingProperty, nameof(NewsViewModel.IsBusy), mode: BindingMode.OneWay);
+        refresh.Command = new Command(async () => await RefreshAsync(force: false));
 
         var layout = new Grid
         {
@@ -66,7 +64,7 @@ public sealed class NewsPage : ContentPage
             BackgroundColor = Themes.Current.Background,
         };
 
-        layout.Add(_list!, 0, 0);
+        layout.Add(refresh, 0, 0);
         layout.Add(status, 0, 1);
 
         return layout;

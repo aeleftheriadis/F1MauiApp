@@ -36,7 +36,7 @@ public sealed class PaddockPage : ContentPage
             Themes.Current.TextSecondary);
         _noPhoto.IsVisible = false;
 
-        Content = new Label { Text = "paddock" };
+        Content = BuildContent();
 
         Themes.Changed += (_, _) => Content = BuildContent();
         A11y.WatchStatus(_viewModel, nameof(PaddockViewModel.Status), () => _viewModel.Status);
@@ -60,6 +60,20 @@ public sealed class PaddockPage : ContentPage
 
         _loaded = true;
         _viewModel.Refresh();
+        _ = LoadDuelsAsync();
+    }
+
+    private async Task LoadDuelsAsync()
+    {
+        try
+        {
+            await _viewModel.LoadDuelsAsync(CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            // The dossier is still useful without a duel line; log rather than fail the screen.
+            Diagnostics.Write("PAGE", exception, "paddock duels");
+        }
     }
 
     private void ApplyPortrait()
@@ -86,6 +100,10 @@ public sealed class PaddockPage : ContentPage
 
     private View BuildContent()
     {
+        // Both are created in the constructor and re-parented on every palette rebuild.
+        (_portrait.Parent as Layout)?.Remove(_portrait);
+        (_noPhoto.Parent as Layout)?.Remove(_noPhoto);
+
         var dossier = Surfaces.Card(
             new VerticalStackLayout
             {
@@ -110,6 +128,8 @@ public sealed class PaddockPage : ContentPage
                     },
                     Bind(Surfaces.Mono("—", 10, Themes.Current.TextSecondary),
                         Label.TextProperty, nameof(PaddockViewModel.DossierDetail)),
+                    Bind(Surfaces.Mono(string.Empty, 10, Themes.Current.LiveText),
+                        Label.TextProperty, nameof(PaddockViewModel.DuelLine)),
                     new Border
                     {
                         StrokeThickness = 1,
@@ -148,12 +168,17 @@ public sealed class PaddockPage : ContentPage
             {
                 new RowDefinition(GridLength.Auto),
                 new RowDefinition(GridLength.Star),
+                new RowDefinition(GridLength.Auto),
             },
             BackgroundColor = Themes.Current.Background,
         };
 
         layout.Add(dossier, 0, 0);
         layout.Add(roster, 0, 1);
+        layout.Add(
+            Surfaces.StatusBar(_viewModel, nameof(PaddockViewModel.Status), nameof(PaddockViewModel.IsBusy)),
+            0,
+            2);
         return layout;
     }
 

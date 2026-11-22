@@ -1,9 +1,11 @@
+using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using F1App.Domain;
 using F1App.Services;
 using F1App.Telemetry;
+using F1App.Telemetry.Providers;
 using F1App.Telemetry.Timing;
 using F1App.Theme;
 
@@ -97,6 +99,7 @@ public sealed partial class PitWallViewModel : ObservableObject
 
     private readonly SessionRunner _runner;
     private readonly OpenF1SessionTimingLoader _timing;
+    private readonly OpenF1Client _client;
     private readonly TelemetrySnapshotStore _store;
     private readonly IClock _clock;
     private readonly TelemetryFrame[] _frames = new TelemetryFrame[TelemetrySnapshotStore.MaxDriverNumber];
@@ -105,16 +108,19 @@ public sealed partial class PitWallViewModel : ObservableObject
     public PitWallViewModel(
         SessionRunner runner,
         OpenF1SessionTimingLoader timing,
+        OpenF1Client client,
         TelemetrySnapshotStore store,
         IClock clock)
     {
         ArgumentNullException.ThrowIfNull(runner);
         ArgumentNullException.ThrowIfNull(timing);
+        ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(clock);
 
         _runner = runner;
         _timing = timing;
+        _client = client;
         _store = store;
         _clock = clock;
 
@@ -188,6 +194,10 @@ public sealed partial class PitWallViewModel : ObservableObject
     [ObservableProperty]
     public partial bool IsLoaded { get; set; }
 
+    /// <summary>Track conditions for the session, or empty when the provider published none.</summary>
+    [ObservableProperty]
+    public partial string Conditions { get; set; } = string.Empty;
+
     /// <summary>Loads the classification for the session the runner is replaying.</summary>
     public async Task LoadAsync(CancellationToken cancellationToken)
     {
@@ -226,6 +236,32 @@ public sealed partial class PitWallViewModel : ObservableObject
 
         IsBusy = false;
         Subhead = _runner.SessionLabel;
+
+        await LoadConditionsAsync(cancellationToken).ConfigureAwait(true);
+    }
+
+    /// <summary>
+    /// Reads the session's conditions. One request, and the latest sample is what a screen wants - the
+    /// history is not plotted, so it is not kept.
+    /// </summary>
+    private async Task LoadConditionsAsync(CancellationToken cancellationToken)
+    {
+        var loaded = await _client.GetWeatherAsync(_runner.SessionKey, cancellationToken).ConfigureAwait(true);
+
+        if (loaded is not ImmutableArray<OpenF1Weather> samples || samples.IsEmpty)
+        {
+            // No weather published for this session: say nothing rather than show a blank line.
+            Conditions = string.Empty;
+            return;
+        }
+
+        var latest = samples.MaxBy(static sample => sample.Date)!;
+        Conditions = new TrackConditions(
+            latest.AirTemperature,
+            latest.TrackTemperature,
+            latest.Humidity,
+            latest.Rainfall is not null and not 0,
+            latest.WindSpeed).Describe();
     }
 
     /// <summary>Refreshes the live columns. Called from the page tick.</summary>

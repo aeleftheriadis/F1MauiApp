@@ -72,6 +72,10 @@ public sealed class SeasonHubPage : ContentPage
 
     private View BuildContent()
     {
+        // The palette swap rebuilds this page; a control created in the constructor still has its old
+        // parent, and MAUI refuses to add it twice.
+        (_year.Parent as Layout)?.Remove(_year);
+
         var header = new VerticalStackLayout
         {
             Padding = new Thickness(Tokens.Space4, Tokens.Space3, Tokens.Space4, Tokens.Space2),
@@ -125,9 +129,14 @@ public sealed class SeasonHubPage : ContentPage
             ItemTemplate = new DataTemplate(BuildRow),
             SelectionMode = SelectionMode.None,
             BackgroundColor = Themes.Current.Background,
-            Footer = Bind(Surfaces.Mono("—", 10, Themes.Current.TextSecondary),
-                Label.TextProperty, nameof(SeasonHubViewModel.Status)),
         };
+
+        // Pull-to-refresh re-fetches the calendar; the footer carries the spinner instead of a bare label.
+        var refresh = new RefreshView { Content = list };
+        refresh.SetBinding(RefreshView.IsRefreshingProperty, nameof(SeasonHubViewModel.IsBusy), mode: BindingMode.OneWay);
+        refresh.Command = new Command(async () => await LoadAsync(refresh: true));
+
+        var status = Surfaces.StatusBar(_viewModel, nameof(SeasonHubViewModel.Status), nameof(SeasonHubViewModel.IsBusy));
 
         var layout = new Grid
         {
@@ -136,17 +145,19 @@ public sealed class SeasonHubPage : ContentPage
                 new RowDefinition(GridLength.Auto),
                 new RowDefinition(GridLength.Auto),
                 new RowDefinition(GridLength.Star),
+                new RowDefinition(GridLength.Auto),
             },
             BackgroundColor = Themes.Current.Background,
         };
 
         layout.Add(header, 0, 0);
         layout.Add(hero, 0, 1);
-        layout.Add(list, 0, 2);
+        layout.Add(refresh, 0, 2);
+        layout.Add(status, 0, 3);
         return layout;
     }
 
-    private static View BuildRow()
+    private View BuildRow()
     {
         var round = Bind(Surfaces.Mono("—", 11, Themes.Current.TextSecondary, bold: true),
             Label.TextProperty, nameof(SeasonRound.Round));
@@ -181,7 +192,27 @@ public sealed class SeasonHubPage : ContentPage
             Children = { new HorizontalStackLayout { Spacing = Tokens.Space2, Children = { round, name } }, circuit, meta },
         };
 
-        return Surfaces.Card(body, new Thickness(Tokens.Space3, Tokens.Space1));
+        var card = Surfaces.Row(body, Thickness.Zero);
+        var tap = new TapGestureRecognizer();
+        tap.Tapped += async (sender, _) =>
+        {
+            if (sender is BindableObject { BindingContext: SeasonRound round })
+            {
+                try
+                {
+                    // Switching what every other screen follows is a real action: it gets feedback.
+                    HapticFeedback.Default.Perform(HapticFeedbackType.Click);
+                    await _viewModel.ReplayAsync(round, CancellationToken.None);
+                }
+                catch (Exception exception)
+                {
+                    _viewModel.Status = $"replay unavailable: {exception.GetType().Name}";
+                    Diagnostics.Write("PAGE", exception, "season round replay");
+                }
+            }
+        };
+        card.GestureRecognizers.Add(tap);
+        return card;
     }
 
     private static T Bind<T>(T target, BindableProperty property, string path)

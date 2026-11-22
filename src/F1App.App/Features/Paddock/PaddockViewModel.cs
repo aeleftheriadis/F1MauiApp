@@ -1,15 +1,23 @@
+using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using F1App.Domain;
 using F1App.Services;
+using F1App.Telemetry.Facts;
 using F1App.Telemetry.Media;
 using F1App.Theme;
 
 namespace F1App.Features.Paddock;
 
 /// <summary>A driver in the paddock roster.</summary>
-public sealed record PaddockDriver(int Number, string Code, string Name, string Team, Color Colour)
+public sealed record PaddockDriver(
+    int Number,
+    string Code,
+    string Name,
+    string Team,
+    Color Colour,
+    string? HeadshotUrl = null)
 {
     public string Label => $"#{Number} · {Code}";
 }
@@ -27,22 +35,27 @@ public sealed partial class PaddockViewModel : ObservableObject
     private readonly SessionRunner _runner;
     private readonly WikimediaImageClient _images;
     private readonly SqliteMediaCache _cache;
+    private readonly TeammateDuelService _duels;
     private readonly TimeProvider _timeProvider;
+    private ImmutableDictionary<string, TeammateDuel> _duelsByDriver = ImmutableDictionary<string, TeammateDuel>.Empty;
 
     public PaddockViewModel(
         SessionRunner runner,
         WikimediaImageClient images,
         SqliteMediaCache cache,
+        TeammateDuelService duels,
         TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(runner);
         ArgumentNullException.ThrowIfNull(images);
         ArgumentNullException.ThrowIfNull(cache);
+        ArgumentNullException.ThrowIfNull(duels);
         ArgumentNullException.ThrowIfNull(timeProvider);
 
         _runner = runner;
         _images = images;
         _cache = cache;
+        _duels = duels;
         _timeProvider = timeProvider;
 
         Headline = "paddock";
@@ -51,6 +64,7 @@ public sealed partial class PaddockViewModel : ObservableObject
         DossierDetail = string.Empty;
         PortraitCaption = string.Empty;
         PortraitUrl = null;
+        DuelLine = string.Empty;
     }
 
     /// <summary>Drivers of the current session.</summary>
@@ -82,12 +96,47 @@ public sealed partial class PaddockViewModel : ObservableObject
     [ObservableProperty]
     public partial string PortraitCaption { get; set; }
 
+    /// <summary>Teammate head-to-head for this driver, or empty when the season has none.</summary>
+    [ObservableProperty]
+    public partial string DuelLine { get; set; }
+
     /// <summary>True when the subject was looked up and has no freely licensed picture.</summary>
     [ObservableProperty]
     public partial bool HasNoPortrait { get; set; }
 
     [ObservableProperty]
     public partial bool IsBusy { get; set; }
+
+    /// <summary>Loads this season's teammate duels once and caches the map for every selection.</summary>
+    public async Task LoadDuelsAsync(CancellationToken cancellationToken)
+    {
+        var season = _timeProvider.GetUtcNow().Year;
+        var snapshot = await _duels.GetAsync(season, force: false, cancellationToken).ConfigureAwait(true);
+        _duelsByDriver = snapshot.Duels;
+        ApplyDuel();
+    }
+
+    private void ApplyDuel()
+    {
+        if (SelectedIndex < 0 || SelectedIndex >= Drivers.Count)
+        {
+            DuelLine = string.Empty;
+            return;
+        }
+
+        // The roster carries the OpenF1 driver, whose name is the full name; the duel is keyed by driver
+        // code, which both sources agree on.
+        var code = Drivers[SelectedIndex].Code;
+
+        DuelLine = _duelsByDriver.Values
+            .FirstOrDefault(duel => string.Equals(duel.DriverCode, code, StringComparison.OrdinalIgnoreCase)) is { } match
+            ? string.Create(
+                CultureInfo.InvariantCulture,
+                $"vs {match.TeammateName}: races {match.RaceWins}-{match.TeammateWins}, "
+                + $"average {match.AveragePositionDelta:+0.0;-0.0;0.0} places, "
+                + $"qualifying {match.QualifyingWins}-{match.QualifyingLosses} over {match.Compared} races")
+            : string.Empty;
+    }
 
     /// <summary>Fills the roster from the loaded replay.</summary>
     public void Refresh()
@@ -109,7 +158,8 @@ public sealed partial class PaddockViewModel : ObservableObject
                 driver.Code,
                 driver.FullName,
                 driver.TeamName,
-                Parse(driver.TeamColorHex)));
+                Parse(driver.TeamColorHex),
+                driver.HeadshotUrl));
         }
 
         Headline = string.Create(CultureInfo.InvariantCulture, $"paddock · {Drivers.Count} drivers");
@@ -135,6 +185,16 @@ public sealed partial class PaddockViewModel : ObservableObject
         PortraitUrl = null;
         PortraitCaption = string.Empty;
         HasNoPortrait = false;
+        ApplyDuel();
+
+        // The provider's own headshot first: it is the current season's picture of the right driver, and it
+        // needs no search. Commons is the fallback for the one driver it omits, and carries the licence text.
+        if (!string.IsNullOrWhiteSpace(driver.HeadshotUrl))
+        {
+            PortraitUrl = driver.HeadshotUrl;
+            PortraitCaption = "Portrait: Formula 1 media, via OpenF1";
+            return;
+        }
 
         var cached = await _cache.ReadAsync(driver.Name, cancellationToken).ConfigureAwait(true);
 

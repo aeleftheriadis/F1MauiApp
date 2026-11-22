@@ -17,7 +17,9 @@ public sealed class OpenF1CircuitCatalogueTests
 
     private static (OpenF1CircuitCatalogue Catalogue, StubHttpHandler Handler) Create()
     {
-        var handler = new StubHttpHandler();
+        // The catalogue asks for the season's meetings too (icons, flags, circuit type); empty is a
+        // legitimate answer and keeps every existing test focused on the sessions it maps.
+        var handler = new StubHttpHandler().Map("meetings?year=", HttpStatusCode.OK, "[]");
         var client = new OpenF1Client(
             new HttpClient(handler),
             new RequestGate(TimeSpan.FromMilliseconds(1), TimeProvider.System));

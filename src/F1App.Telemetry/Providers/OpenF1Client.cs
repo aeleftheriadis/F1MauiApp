@@ -48,6 +48,21 @@ public sealed class OpenF1Client
         return GetArrayAsync($"sessions?year={year}", OpenF1JsonContext.Default.ListOpenF1Session, cancellationToken);
     }
 
+    /// <summary>Track conditions for a session, one sample per minute, oldest first.</summary>
+    public Task<FetchResult<ImmutableArray<OpenF1Weather>>> GetWeatherAsync(
+        int sessionKey,
+        CancellationToken cancellationToken) =>
+        GetArrayAsync($"weather?session_key={sessionKey}", OpenF1JsonContext.Default.ListOpenF1Weather, cancellationToken);
+
+    /// <summary>Every meeting of a season, with the provider's circuit icon and country flag.</summary>
+    public Task<FetchResult<ImmutableArray<OpenF1Meeting>>> GetMeetingsAsync(
+        int year,
+        CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(year, 2023);
+        return GetArrayAsync($"meetings?year={year}", OpenF1JsonContext.Default.ListOpenF1Meeting, cancellationToken);
+    }
+
     /// <summary>Recorded GPS positions for a session window, optionally limited to one driver.</summary>
     public Task<FetchResult<ImmutableArray<OpenF1Location>>> GetLocationsAsync(
         int sessionKey,

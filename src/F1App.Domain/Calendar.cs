@@ -46,9 +46,18 @@ public sealed record RaceWeekend(
     DateTimeOffset RaceStart);
 
 /// <summary>A driver and the constructor they currently race for.</summary>
+/// <param name="Number">Car number for the season.</param>
+/// <param name="Code">Three-letter acronym.</param>
+/// <param name="FullName">Name as published.</param>
+/// <param name="TeamName">Constructor name.</param>
+/// <param name="TeamColorHex">Team colour, \#RRGGBB.</param>
+/// <param name="HeadshotUrl">
+/// Portrait published by the provider, when it has one. Null means "ask Commons instead".
+/// </param>
 public sealed record Driver(
     int Number,
     string Code,
     string FullName,
     string TeamName,
-    string TeamColorHex);
+    string TeamColorHex,
+    string? HeadshotUrl = null);

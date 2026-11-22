@@ -230,6 +230,8 @@ public sealed class PitWallPage : ContentPage, IDisposable
                 eyebrow,
                 Bind(Surfaces.Text("session", Tokens.FontBody, Themes.Current.TextPrimary, bold: true),
                     Label.TextProperty, nameof(PitWallViewModel.Headline)),
+                Bind(Surfaces.Mono(string.Empty, 10, Themes.Current.TextSecondary),
+                    Label.TextProperty, nameof(PitWallViewModel.Conditions)),
             },
         };
 

@@ -43,14 +43,26 @@ Jolpica ┘   (per provider)                   └─> SQLite caches ─> pages
 | Weekend | OpenF1 `/sessions` for the current meeting + `WeekendPhase` closed hierarchy |
 | Pit wall | classification (OpenF1 laps/position/intervals/stints/pit/drivers) + live replay samples |
 | Timing | replay samples only |
-| Track | circuit atlas, geometry from one car's recorded GPS lap |
+| Track | circuit atlas, geometry from one car's recorded GPS lap, provider track icon + flag, Commons aerial photo |
 | Results | six OpenF1 endpoints folded into `SessionTiming` |
 | Strategy | `stints` + `drivers` |
 | Compare | replay samples, speed against elapsed time |
-| Paddock | session driver list + Wikimedia Commons portraits |
+| Paddock | session driver list + the provider's headshot (Commons fallback) + teammate duels from cached season classifications |
+| Archive | Jolpica `/{season}/results/1.json` vault in SQLite: every race since 1950 with its winner, all-time win records and "on this day", both computed from the same rows |
 | Facts | Jolpica champions, persisted |
-| News | ten public RSS/Atom feeds |
+| News | nine public RSS/Atom feeds (r/formula1 removed 2026-11-22: Reddit now requires a login) |
 | Settings | theme, live-feed opt-in, diagnostics |
+
+## Navigation
+
+| Idiom | Shape | Screens |
+| --- | --- | --- |
+| Phone | `TabBar`, five bottom tabs | Season, Pit wall, Archive, Paddock, More |
+| Desktop / Mac | flyout, five groups | every screen, grouped Live / Championship / Circuit / People / Media |
+
+The nine non-tab screens are registered routes pushed from `MorePage` on phones and shown directly in the flyout
+on desktop; both read the same `AppShell.Secondary` table (ADR-014). `F1APP_PHONE=1` forces the phone shell so
+the smoke walk can exercise it on a desktop build.
 
 ## State that survives a restart
 
@@ -59,6 +71,8 @@ Jolpica ┘   (per provider)                   └─> SQLite caches ─> pages
 | `races` | calendar per season | a screen that needs the network to open is not offline-first |
 | `champions` | season champions | historical, changes once a year |
 | `circuit_winners` | winners per circuit | historical, changes once a year |
+| `race_vault` | every WC race since 1950 with its winner | historical: one request per season, ever; the current season refreshes daily |
+| `season_results` | full classification of the current season | head-to-head needs every race at driver level; refreshed daily, five paged requests |
 | `media` | resolved Commons image + attribution | one request per subject, ever |
 
 `Preferences` holds the theme mode and the live-feed opt-in.
@@ -84,7 +98,7 @@ start-up failure that never reached a managed handler.
 | OpenF1 | sessions, location, car data, laps, intervals, stints, pit, position, drivers | anonymous; 3 req/s, 30 req/min (enforced); historical only — live needs a paid credential, which the project forbids |
 | Jolpica | calendar, champions, circuit winners | anonymous; limit unpublished, self-limited to 120/min + burst 4, cached 24 h |
 | Wikimedia Commons | driver photographs | anonymous; CC licences, attribution displayed |
-| 10 RSS/Atom feeds | headlines as links | per publisher; Reddit needs a browser-shaped User-Agent |
+| 9 RSS/Atom feeds | headlines as links | per publisher; some publishers 403 a non-browser agent |
 
 Measured disagreements are recorded rather than papered over: for 2026 OpenF1 lists 25 race sessions and
 Jolpica 23 (the two Jolpica lacks are 2026-04-12 and 2026-04-19), so OpenF1 owns the circuit list and
