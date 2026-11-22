@@ -146,22 +146,39 @@ public sealed class PitWallPage : ContentPage, IDisposable
         }
     }
 
+    /// <summary>Fills the list of the section that is actually on screen.</summary>
+    /// <remarks>
+    /// Filling both lists crashed the app: adding items to the Media collection view while the News tab
+    /// was the visible one killed XAML inside its input machinery (0xc000027b in CoreMessagingXP, at the
+    /// same offset as the reported "clicking NEWS closes the app"). Bisected in the smoke walk - the news
+    /// list alone is fine, the hidden media list alone crashes. A hidden CollectionView is not something
+    /// to be repopulating; switching tabs already refills the list it reveals.
+    /// </remarks>
     private void RebuildNews()
     {
-        _visibleNews.Clear();
-        _visibleMedia.Clear();
+        if (_section is not (Section.News or Section.Media))
+        {
+            return;
+        }
+
+        var isNews = _section == Section.News;
+        var target = isNews ? _visibleNews : _visibleMedia;
+
+        target.Clear();
 
         foreach (var row in _news.Items)
         {
-            if (_newsFilter == "ALL" || string.Equals(row.Source, _newsFilter, StringComparison.Ordinal))
+            if (isNews)
             {
-                _visibleNews.Add(row);
+                if (_newsFilter == "ALL" || string.Equals(row.Source, _newsFilter, StringComparison.Ordinal))
+                {
+                    target.Add(row);
+                }
             }
-
-            if (string.Equals(row.Kind, "video", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(row.Kind, "podcast", StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(row.Kind, "video", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(row.Kind, "podcast", StringComparison.OrdinalIgnoreCase))
             {
-                _visibleMedia.Add(row);
+                target.Add(row);
             }
         }
     }
@@ -232,6 +249,8 @@ public sealed class PitWallPage : ContentPage, IDisposable
                     Label.TextProperty, nameof(PitWallViewModel.Headline)),
                 Bind(Surfaces.Mono(string.Empty, 10, Themes.Current.TextSecondary),
                     Label.TextProperty, nameof(PitWallViewModel.Conditions)),
+                Bind(Surfaces.Mono(string.Empty, 9, Themes.Current.TeleYellow),
+                    Label.TextProperty, nameof(PitWallViewModel.RaceControl)),
             },
         };
 
@@ -937,6 +956,7 @@ public sealed class PitWallPage : ContentPage, IDisposable
     /// </remarks>
     private void EnsureSectionLoaded()
     {
+
         switch (_section)
         {
             case Section.Timing:
@@ -962,6 +982,12 @@ public sealed class PitWallPage : ContentPage, IDisposable
                 break;
         }
     }
+
+    /// <summary>Smoke-only: presses a section tab, the one interaction the walk cannot reach.</summary>
+    internal void SmokeSelectSection(int index) => ShowSection((Section)index);
+
+    /// <summary>Smoke-only: the section tab itself, so a real pointer click can be aimed at it.</summary>
+    internal Button SmokeSectionButton(int index) => _sectionButtons[index];
 
     private void ShowSection(Section section)
     {

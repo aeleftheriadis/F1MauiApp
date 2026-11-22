@@ -198,6 +198,10 @@ public sealed partial class PitWallViewModel : ObservableObject
     [ObservableProperty]
     public partial string Conditions { get; set; } = string.Empty;
 
+    /// <summary>The last few race-control messages, newest first, one per line.</summary>
+    [ObservableProperty]
+    public partial string RaceControl { get; set; } = string.Empty;
+
     /// <summary>Loads the classification for the session the runner is replaying.</summary>
     public async Task LoadAsync(CancellationToken cancellationToken)
     {
@@ -238,6 +242,69 @@ public sealed partial class PitWallViewModel : ObservableObject
         Subhead = _runner.SessionLabel;
 
         await LoadConditionsAsync(cancellationToken).ConfigureAwait(true);
+        await LoadRaceControlAsync(cancellationToken).ConfigureAwait(true);
+    }
+
+    /// <summary>
+    /// The session's most recent race-control messages.
+    /// </summary>
+    /// <remarks>
+    /// Newest first and capped at four: this is context for the numbers beside it - a yellow flag explains a
+    /// slow sector, a safety car explains a compressed gap - not a transcript. Messages are the provider's own
+    /// words, trimmed but never reworded.
+    /// </remarks>
+    /// <summary>
+    /// Lower sorts first: a yellow or a safety car outranks routine traffic.
+    /// </summary>
+    /// <remarks>
+    /// "CLEAR" is itself a flag value, so ranking anything with a flag at the top filled the strip with
+    /// "CLEAR IN TRACK SECTOR" - the same four lines the screenshot showed before this ordering existed.
+    /// Clearing a sector is housekeeping, not news; a yellow is.
+    /// </remarks>
+    private static int Priority(OpenF1RaceControl item)
+    {
+        var flag = item.Flag?.Trim().ToUpperInvariant();
+
+        if (flag is "CLEAR" or null or "")
+        {
+            return item.Category switch
+            {
+                "SafetyCar" => 0,
+                "SessionStatus" => 1,
+                "Flag" => 3,
+                _ => 2,
+            };
+        }
+
+        // Any other flag: yellow, double yellow, red, chequered, black and white - all worth showing first.
+        return 0;
+    }
+
+    private async Task LoadRaceControlAsync(CancellationToken cancellationToken)
+    {
+        var loaded = await _client.GetRaceControlAsync(_runner.SessionKey, cancellationToken).ConfigureAwait(true);
+
+        if (loaded is not ImmutableArray<OpenF1RaceControl> events || events.IsEmpty)
+        {
+            RaceControl = string.Empty;
+            return;
+        }
+
+        var lines = events
+            .Where(static item => !string.IsNullOrWhiteSpace(item.Message))
+            // A screenshot showed four identical "CLEAR IN TRACK SECTOR" lines pushing every flag out of the
+            // strip: what matters is ordered first, and only then by recency.
+            .OrderBy(static item => Priority(item))
+            .ThenByDescending(static item => item.Date)
+            .Take(4)
+            .Select(item => new RaceControlEvent(
+                item.Category ?? string.Empty,
+                item.Flag ?? string.Empty,
+                item.Message!,
+                item.LapNumber).Describe())
+            .ToArray();
+
+        RaceControl = string.Join(Environment.NewLine, lines);
     }
 
     /// <summary>

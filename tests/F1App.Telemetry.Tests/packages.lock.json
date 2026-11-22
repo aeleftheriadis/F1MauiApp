@@ -149,7 +149,8 @@
         "type": "Project",
         "dependencies": {
           "F1App.Domain": "[1.0.0, )",
-          "Microsoft.Data.Sqlite": "[11.0.0, )"
+          "Microsoft.Data.Sqlite": "[11.0.0, )",
+          "Polly.Core": "[8.9.1, )"
         }
       },
       "Microsoft.Data.Sqlite": {
@@ -162,6 +163,12 @@
           "SQLitePCLRaw.bundle_e_sqlite3": "3.0.5",
           "SQLitePCLRaw.core": "3.0.5"
         }
+      },
+      "Polly.Core": {
+        "type": "CentralTransitive",
+        "requested": "[8.9.1, )",
+        "resolved": "8.9.1",
+        "contentHash": "L0vfggkkI2nDAW9lCFYSqX9g/+3TkVXhAq+sh6owBq656X9XW0kE2NG+dPYGNQGeK66HS1rKHRPWMm1bMv91kw=="
       }
     }
   }

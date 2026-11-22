@@ -8,12 +8,26 @@ Open items from docs/plan.md (source of truth for detail and status):
 - [ ] Plan 4: Circuit encyclopedia (Wikimedia aerials; corner metadata blocked)
 - [x] Plan 5 (part): "on this day" — DONE 2026-11-22 on the Archive header, computed from the vault. Open: session notifications (needs platform permission plumbing), what-if championship calculator.
 - [ ] Plan 6: live timing — blocked by ADR-009 until first live fixture
+- [x] OpenF1 `championship_drivers` — DONE 2026-11-22 (Paddock dossier: title position, points, race swing)
+- [x] OpenF1 `overtakes` — DONE 2026-11-22 (Results "N made, M lost")
+- [x] OpenF1 `starting_grid` — DONE 2026-11-22 (Results "places ±N", resolved via the qualifying session)
+- [x] OpenF1 `race_control` — DONE 2026-11-22 (Pit wall: 4 newest messages). Open: flag-first ordering, Timing tower
+- [x] OpenF1 `session_result` — DONE 2026-11-22 (Results OFFICIAL column: points + DNF/DNS/DSQ)
+- [x] OpenF1 `weather` — DONE 2026-11-22 on the Pit wall header (latest sample, 1 request/session)
 - [ ] OpenF1 unused endpoints (inventory + priorities in docs/plan.md): session_result, race_control, weather,
       starting_grid, overtakes, championship_drivers/teams (beta), team_radio (licensing). Measured available
       keylessly except team_radio's licensing question and starting_grid's qualifying-session key.
+- [x] Desktop visual pass via `F1APP_SHOTS=1` screenshots — 8 defects found and fixed 2026-11-22
+- [ ] Phone visual pass (screenshots forced with F1APP_PHONE=1 still need a device for gestures/status bar)
+- [x] Crash clicking the pit-wall NEWS tab — fixed 2026-11-22 (hidden Media CollectionView was being repopulated)
+- [ ] Static event leaks: `Themes.Changed` and the singleton `NewsViewModel.PropertyChanged` are subscribed in
+      every page constructor and never unsubscribed — closed pages still rebuild content. Not the cause of the
+      NEWS crash, but the same class of "touch a closed view" failure.
 - [ ] Visual checks queued in docs/plan.md ("Visual checks queued") — icons on device, light-theme contrast,
       status spinner feel, Row vs Card, Archive scroll with 1,158 rows, bottom tab bar, light theme
+- [x] Responsive layout for desktop + phone — DONE 2026-11-22 (ADR-017; Paddock, Track, Season, Archive, width-driven via WidthSwitch)
 - [~] Plan A: native look-and-feel — DONE: platform navigation (TabBar/phone + flyout/desktop, ADR-014), `Surfaces.Row` flat list rows on Season/Archive/Facts. OPEN: ActivityIndicator progress, RefreshView, haptics, device verification.
+- [x] Plan B (detail): per-race classification/qualifying/pit stops — DONE 2026-11-22, on demand (ADR-018)
 - [x] Plan B (core): complete archive 1950→ — DONE 2026-11-21, winner-level vault synced + searchable. Still open: full per-race detail screens (classification/qualifying/pit stops).
 - [x] Plan C (core): record book — DONE 2026-11-21 on the Archive screen (all-time wins, drivers + constructors). Still open: poles/podiums/fastest-lap records, circuit/season records, milestones, on-this-day.
 - [ ] Plan D: replay fallback removal — code done 2026-11-21; open question: remove empty replay screens?

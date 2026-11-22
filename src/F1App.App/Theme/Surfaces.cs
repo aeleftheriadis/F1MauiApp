@@ -99,6 +99,26 @@ public static class Surfaces
         return row;
     }
 
+    /// <summary>
+    /// Detaches controls that outlive a page rebuild.
+    /// </summary>
+    /// <remarks>
+    /// Every page rebuilds its content when the palette changes, but controls created once in the constructor
+    /// still belong to the previous tree. Re-adding them corrupts the native visual tree: on WinUI it throws
+    /// <c>COMException 0x800F1000</c> from <c>LayoutHandler.SetVirtualView</c>, and on the paths that do not
+    /// catch it the process dies with no managed trace. Detach before every rebuild.
+    /// </remarks>
+    public static void Detach(params View?[] views)
+    {
+        foreach (var view in views)
+        {
+            if (view?.Parent is Layout parent)
+            {
+                parent.Remove(view);
+            }
+        }
+    }
+
     /// <summary>Prose label in the platform's own font at <paramref name="size"/>.</summary>
     public static Label Text(string text, double size, Color colour, bool bold = false) => new()
     {

@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using F1App.Domain;
 using F1App.Services;
 using F1App.Telemetry.Facts;
+using F1App.Telemetry.Providers;
 using F1App.Telemetry.Media;
 using F1App.Theme;
 
@@ -36,26 +37,31 @@ public sealed partial class PaddockViewModel : ObservableObject
     private readonly WikimediaImageClient _images;
     private readonly SqliteMediaCache _cache;
     private readonly TeammateDuelService _duels;
+    private readonly OpenF1Client _client;
     private readonly TimeProvider _timeProvider;
     private ImmutableDictionary<string, TeammateDuel> _duelsByDriver = ImmutableDictionary<string, TeammateDuel>.Empty;
+    private ImmutableDictionary<int, ChampionshipSwing> _swings = ImmutableDictionary<int, ChampionshipSwing>.Empty;
 
     public PaddockViewModel(
         SessionRunner runner,
         WikimediaImageClient images,
         SqliteMediaCache cache,
         TeammateDuelService duels,
+        OpenF1Client client,
         TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(runner);
         ArgumentNullException.ThrowIfNull(images);
         ArgumentNullException.ThrowIfNull(cache);
         ArgumentNullException.ThrowIfNull(duels);
+        ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(timeProvider);
 
         _runner = runner;
         _images = images;
         _cache = cache;
         _duels = duels;
+        _client = client;
         _timeProvider = timeProvider;
 
         Headline = "paddock";
@@ -65,6 +71,7 @@ public sealed partial class PaddockViewModel : ObservableObject
         PortraitCaption = string.Empty;
         PortraitUrl = null;
         DuelLine = string.Empty;
+        ChampionshipLine = string.Empty;
     }
 
     /// <summary>Drivers of the current session.</summary>
@@ -96,6 +103,10 @@ public sealed partial class PaddockViewModel : ObservableObject
     [ObservableProperty]
     public partial string PortraitCaption { get; set; }
 
+    /// <summary>Title standing and this race's swing for this driver, or empty when not published.</summary>
+    [ObservableProperty]
+    public partial string ChampionshipLine { get; set; }
+
     /// <summary>Teammate head-to-head for this driver, or empty when the season has none.</summary>
     [ObservableProperty]
     public partial string DuelLine { get; set; }
@@ -114,6 +125,51 @@ public sealed partial class PaddockViewModel : ObservableObject
         var snapshot = await _duels.GetAsync(season, force: false, cancellationToken).ConfigureAwait(true);
         _duelsByDriver = snapshot.Duels;
         ApplyDuel();
+
+        await LoadChampionshipAsync(cancellationToken).ConfigureAwait(true);
+    }
+
+    /// <summary>
+    /// Reads the title state for the session being replayed. The beta endpoint answers for race sessions only,
+    /// so anything else leaves the line empty rather than guessing a standing.
+    /// </summary>
+    private async Task LoadChampionshipAsync(CancellationToken cancellationToken)
+    {
+        if (_runner.SessionKey == 0)
+        {
+            return;
+        }
+
+        var loaded = await _client
+            .GetChampionshipDriversAsync(_runner.SessionKey, cancellationToken)
+            .ConfigureAwait(true);
+
+        if (loaded is not ImmutableArray<OpenF1ChampionshipDriver> rows || rows.IsEmpty)
+        {
+            _swings = ImmutableDictionary<int, ChampionshipSwing>.Empty;
+            ChampionshipLine = string.Empty;
+            return;
+        }
+
+        _swings = rows
+            .Where(static row => row.DriverNumber is not null)
+            .GroupBy(static row => row.DriverNumber!.Value)
+            .ToImmutableDictionary(
+                static group => group.Key,
+                static group => new ChampionshipSwing(
+                    group.First().PositionStart,
+                    group.First().PositionCurrent,
+                    group.First().PointsStart,
+                    group.First().PointsCurrent));
+
+        ApplyChampionship();
+    }
+
+    private void ApplyChampionship()
+    {
+        ChampionshipLine = SelectedIndex >= 0 && SelectedIndex < Drivers.Count
+            ? _swings.GetValueOrDefault(Drivers[SelectedIndex].Number).Describe()
+            : string.Empty;
     }
 
     private void ApplyDuel()
@@ -186,6 +242,7 @@ public sealed partial class PaddockViewModel : ObservableObject
         PortraitCaption = string.Empty;
         HasNoPortrait = false;
         ApplyDuel();
+        ApplyChampionship();
 
         // The provider's own headshot first: it is the current season's picture of the right driver, and it
         // needs no search. Commons is the fallback for the one driver it omits, and carries the licence text.

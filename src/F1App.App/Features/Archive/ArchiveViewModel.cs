@@ -3,11 +3,14 @@ using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using F1App.Domain;
 using F1App.Telemetry.Facts;
+using F1App.Theme;
 
 namespace F1App.Features.Archive;
 
 /// <summary>One race of the vault, pre-formatted for the list.</summary>
 public sealed record ArchiveRaceRow(
+    int SeasonNumber,
+    int RoundNumber,
     string Season,
     string Round,
     string RaceName,
@@ -184,13 +187,15 @@ public sealed partial class ArchiveViewModel : ObservableObject
                 continue;
             }
 
-            var date = race.Date.ToString("dd MMM yyyy", CultureInfo.CurrentCulture);
+            var date = Dates.Day(race.Date);
 
             var detail = string.IsNullOrWhiteSpace(race.WinningTime)
                 ? string.Create(CultureInfo.InvariantCulture, $"{race.Constructor} · {race.Laps} laps")
                 : string.Create(CultureInfo.InvariantCulture, $"{race.Constructor} · {race.WinningTime}");
 
             Races.Add(new ArchiveRaceRow(
+                race.Season,
+                race.Round,
                 string.Create(CultureInfo.InvariantCulture, $"{race.Season}"),
                 string.Create(CultureInfo.InvariantCulture, $"R{race.Round:00}"),
                 race.RaceName,

@@ -318,3 +318,57 @@ The catalogue's extra request is one per season and is ignored when it fails, so
 **Consequences.** Images are displayed as the provider serves them - never copied, cropped or bundled - and
 every screen that shows them says whose they are. This is the one place where "open APIs" does not mean "open
 licence", and AGENTS.md records that explicitly rather than letting the rule quietly mean less.
+
+## ADR-017 — One content, two arrangements: a phone column and a wide two-pane
+
+**Status:** accepted
+
+**Context.** The layouts were designed against a phone-width prototype, and on a desktop they read as a
+stretched phone app: a narrow column of rows across a wide window. The request was to support both without
+maintaining two UIs.
+
+**Decision.** `Responsive.Panes(primary, secondary, share)` returns a two-column grid on a wide window and a
+single stacked column on a phone; the page, its bindings and its view model are shared, so only the arrangement
+differs. `Responsive.IsPhone` is the single switch, and `AppShell` now uses the same one, so shell shape and page
+arrangement can never disagree. Applied to Paddock (roster | dossier), Track (map | facts), Season (rounds |
+hero) and Archive (races | record book); tables (Results, Timing) simply use the extra width.
+
+**Evidence.** Both arrangements walk clean: 13 destinations wide, 23 navigations with `F1APP_PHONE=1`, and the
+theme-switching stress run (36 navigations, 3 rounds x 2 themes x 6 screens) reports 0 exceptions, 0
+`COMException`, 0 "already a child" warnings. Two defects were caught building this: the Archive wide branch
+added a pane that was still parented (warning "Grid is already a child of RefreshView"), and it added the list
+grid instead of the RefreshView that owns it - both fixed, and the second is why the list keeps its
+pull-to-refresh in the wide layout instead of losing it.
+
+**Update (same day) - the arrangement now follows the live width.** `Responsive.IsWideAt(width)` compares against
+a 900 pt breakpoint, and each adapted page owns a `WidthSwitch` that reports only when the width *crosses* it:
+a page rebuilds its content on a crossing, never on every resize event. The initial state comes from the idiom, so
+the first layout pass does not rebuild anything. Verified by the stress harness, which now resizes the window to
+700 then 1500 pt and walks Season and Paddock after each: 0 exceptions, 0 `COMException`, 0 re-parent warnings.
+
+**Consequences.** A phone keeps one column whatever happens; a narrow desktop window (split screen, ~700 pt)
+now falls back to one column instead of clipping two; and a window dragged across the breakpoint rebuilds once
+per crossing rather than continuously. `Responsive.IsWide` (idiom only) is still what a page uses before its
+first layout pass.
+
+## ADR-018 — Race detail is fetched on demand, never bulk-synced
+
+**Status:** accepted
+
+**Context.** The archive holds every race since 1950 with its winner. Showing a race in full - classification,
+qualifying, pit stops - from the same source needs three endpoints per race. For 77 seasons that is roughly
+5 500 requests, most of them for races nobody will open.
+
+**Decision.** A race's detail is fetched when the race is opened: three requests, then cached as raw payloads in
+SQLite through the same `SqlitePayloadCache` the OpenF1 client uses. Each section is independent - qualifying is
+only published from 1994 and pit stops from 2012 - so an empty section is reported as "not published", never as
+"none happened".
+
+**Evidence.** Live probe of 2026 round 20: results 22 rows, qualifying 22 rows, pit stops 30 rows. Unit tests
+cover the three-section happy path, a 1970 race with neither optional section (both 404), a failing
+classification, and a second open served entirely from cache (3 requests total for two opens).
+
+**Consequences.** Opening a race cost 3 requests once; the archive itself still costs one request per season.
+A user with no network can read every race they have already opened and no more - which is the same trade the
+champions screen makes. The alternative, a bulk sync, would trade thousands of requests for a completeness the
+UI cannot show faster than on-demand loading already does.

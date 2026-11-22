@@ -110,6 +110,9 @@ public sealed class ComparePage : ContentPage, IDisposable
 
     private View BuildContent()
     {
+        // Controls created once in the constructor must leave the old tree before the rebuild.
+        Surfaces.Detach(_left, _right, _canvas);
+
         var header = new VerticalStackLayout
         {
             Padding = new Thickness(Tokens.Space4, Tokens.Space3),
@@ -156,7 +159,7 @@ public sealed class ComparePage : ContentPage, IDisposable
             TextColor = Themes.Current.TextPrimary,
             TitleColor = Themes.Current.TextSecondary,
             BackgroundColor = Themes.Current.SurfaceMuted,
-            HeightRequest = Tokens.MinTouchTarget,
+            MinimumHeightRequest = Tokens.MinPickerHeight,
         };
 
         picker.SetBinding(Picker.ItemsSourceProperty, itemsPath);

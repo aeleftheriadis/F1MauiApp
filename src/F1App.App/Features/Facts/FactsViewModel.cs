@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using F1App.Telemetry.Facts;
+using F1App.Theme;
 
 namespace F1App.Features.Facts;
 
@@ -56,7 +57,7 @@ public sealed partial class FactsViewModel : ObservableObject
                     $"{numbers}"));
             }
 
-            var fetched = snapshot.FetchedAt.ToLocalTime().ToString("dd MMM HH:mm", CultureInfo.CurrentCulture);
+            var fetched = Dates.DayTime(snapshot.FetchedAt);
 
             Status = snapshot.Problem is { Length: > 0 } problem
                 ? problem

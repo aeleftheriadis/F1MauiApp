@@ -9,6 +9,7 @@ public sealed class SeasonHubPage : ContentPage
     private readonly SeasonHubViewModel _viewModel;
     private readonly Picker _year;
     private bool _loaded;
+    private readonly WidthSwitch _width;
 
     public SeasonHubPage(SeasonHubViewModel viewModel)
     {
@@ -16,6 +17,7 @@ public sealed class SeasonHubPage : ContentPage
 
         _viewModel = viewModel;
         BindingContext = viewModel;
+        _width = new WidthSwitch(Responsive.IsWideAt(Width), () => Content = BuildContent());
         Title = "Season";
         BackgroundColor = Themes.Current.Background;
         SafeAreaEdges = SafeAreaEdges.Container;
@@ -25,7 +27,7 @@ public sealed class SeasonHubPage : ContentPage
             TextColor = Themes.Current.TextPrimary,
             TitleColor = Themes.Current.TextSecondary,
             BackgroundColor = Themes.Current.SurfaceMuted,
-            HeightRequest = Tokens.MinTouchTarget,
+            MinimumHeightRequest = Tokens.MinPickerHeight,
             ItemsSource = (System.Collections.IList)_viewModel.Years,
             SelectedIndex = _viewModel.YearIndex,
         };
@@ -42,6 +44,13 @@ public sealed class SeasonHubPage : ContentPage
 
         Themes.Changed += (_, _) => Content = BuildContent();
         A11y.WatchStatus(_viewModel, nameof(SeasonHubViewModel.Status), () => _viewModel.Status);
+    }
+
+    /// <inheritdoc />
+    protected override void OnSizeAllocated(double width, double height)
+    {
+        base.OnSizeAllocated(width, height);
+        _width.Observe(width);
     }
 
     protected override void OnAppearing()
@@ -72,9 +81,9 @@ public sealed class SeasonHubPage : ContentPage
 
     private View BuildContent()
     {
-        // The palette swap rebuilds this page; a control created in the constructor still has its old
-        // parent, and MAUI refuses to add it twice.
-        (_year.Parent as Layout)?.Remove(_year);
+        // Controls created once in the constructor must leave the old tree before the rebuild.
+        Surfaces.Detach(_year);
+
 
         var header = new VerticalStackLayout
         {
@@ -143,18 +152,42 @@ public sealed class SeasonHubPage : ContentPage
             RowDefinitions =
             {
                 new RowDefinition(GridLength.Auto),
-                new RowDefinition(GridLength.Auto),
                 new RowDefinition(GridLength.Star),
                 new RowDefinition(GridLength.Auto),
             },
             BackgroundColor = Themes.Current.Background,
         };
 
+        // Wide: the next-race hero sits beside the rounds instead of pushing them off the first screen.
+        // It sizes to its content: a card stretched down an empty column reads as a broken layout.
+        hero.VerticalOptions = LayoutOptions.Start;
         layout.Add(header, 0, 0);
-        layout.Add(hero, 0, 1);
-        layout.Add(refresh, 0, 2);
-        layout.Add(status, 0, 3);
+        layout.Add(
+            Responsive.IsWide
+                ? Responsive.Panes(refresh, hero, primaryShare: 0.68, wide: _width.IsWide)
+                : StackHeroAbove(hero, refresh),
+            0,
+            1);
+        layout.Add(status, 0, 2);
         return layout;
+    }
+
+    /// <summary>Phone: the hero card above the rounds, in one column.</summary>
+    private static View StackHeroAbove(View hero, View list)
+    {
+        var grid = new Grid
+        {
+            RowDefinitions =
+            {
+                new RowDefinition(GridLength.Auto),
+                new RowDefinition(GridLength.Star),
+            },
+            BackgroundColor = Themes.Current.Background,
+        };
+
+        grid.Add(hero, 0, 0);
+        grid.Add(list, 0, 1);
+        return grid;
     }
 
     private View BuildRow()

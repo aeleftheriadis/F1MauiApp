@@ -13,14 +13,19 @@ namespace F1App.Features.Archive;
 public sealed class ArchivePage : ContentPage
 {
     private readonly ArchiveViewModel _viewModel;
+    private readonly IServiceProvider _services;
     private bool _loaded;
+    private readonly WidthSwitch _width;
 
-    public ArchivePage(ArchiveViewModel viewModel)
+    public ArchivePage(ArchiveViewModel viewModel, IServiceProvider services)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
+        ArgumentNullException.ThrowIfNull(services);
 
         _viewModel = viewModel;
+        _services = services;
         BindingContext = viewModel;
+        _width = new WidthSwitch(Responsive.IsWideAt(Width), () => Content = BuildContent());
         Title = "Archive";
         BackgroundColor = Themes.Current.Background;
         SafeAreaEdges = SafeAreaEdges.Container;
@@ -29,6 +34,13 @@ public sealed class ArchivePage : ContentPage
 
         A11y.WatchStatus(_viewModel, nameof(ArchiveViewModel.Status), () => _viewModel.Status);
         Themes.Changed += (_, _) => Content = BuildContent();
+    }
+
+    /// <inheritdoc />
+    protected override void OnSizeAllocated(double width, double height)
+    {
+        base.OnSizeAllocated(width, height);
+        _width.Observe(width);
     }
 
     protected override void OnAppearing()
@@ -76,7 +88,8 @@ public sealed class ArchivePage : ContentPage
             TextColor = Themes.Current.TextPrimary,
             TitleColor = Themes.Current.TextSecondary,
             BackgroundColor = Themes.Current.SurfaceMuted,
-            HeightRequest = Tokens.MinTouchTarget,
+            MinimumHeightRequest = Tokens.MinPickerHeight,
+            MinimumWidthRequest = 96,
             ItemsSource = (System.Collections.IList)_viewModel.Decades,
         };
         decade.SetBinding(Picker.SelectedIndexProperty, nameof(ArchiveViewModel.DecadeIndex));
@@ -113,6 +126,61 @@ public sealed class ArchivePage : ContentPage
         var refresh = new RefreshView { Content = lists };
         refresh.SetBinding(RefreshView.IsRefreshingProperty, nameof(ArchiveViewModel.IsBusy), mode: BindingMode.OneWay);
         refresh.Command = new Command(async () => await LoadAsync());
+
+        // Wide: races and the record book are both visible, so the segment is not needed. Phone: one at a time.
+        if (_width.IsWide)
+        {
+            // Both panes are on screen at once here, so the RACES/RECORDS toggle does not apply: drop the
+            // visibility bindings rather than leaving something that could hide a pane later.
+            races.RemoveBinding(IsVisibleProperty);
+            records.RemoveBinding(IsVisibleProperty);
+            races.IsVisible = true;
+            records.IsVisible = true;
+
+            var split = new Grid
+            {
+                ColumnDefinitions =
+                {
+                    new ColumnDefinition(new GridLength(0.62, GridUnitType.Star)),
+                    new ColumnDefinition(new GridLength(0.38, GridUnitType.Star)),
+                },
+                ColumnSpacing = Tokens.Space3,
+                BackgroundColor = Themes.Current.Background,
+            };
+
+            var wideLayout = new Grid
+            {
+                RowDefinitions =
+                {
+                    new RowDefinition(GridLength.Auto),
+                    new RowDefinition(GridLength.Star),
+                    new RowDefinition(GridLength.Auto),
+                },
+                ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) },
+                BackgroundColor = Themes.Current.Background,
+            };
+
+            wideLayout.Add(search, 0, 0);
+            wideLayout.Add(decade, 1, 0);
+
+            // The races pane goes in with its RefreshView, not around it: the list is the refresh wrapper's
+            // content, and adding it elsewhere would re-parent it out from under its own pull-to-refresh.
+            Surfaces.Detach(records);
+
+            split.Add(refresh, 0);
+            split.Add(records, 1);
+
+            wideLayout.Add(split, 0, 1);
+            Grid.SetColumnSpan(split, 2);
+
+            var wideStatus = Surfaces.StatusBar(
+                _viewModel,
+                nameof(ArchiveViewModel.Status),
+                nameof(ArchiveViewModel.IsBusy));
+            wideLayout.Add(wideStatus, 0, 2);
+            Grid.SetColumnSpan(wideStatus, 2);
+            return wideLayout;
+        }
 
         var layout = new Grid
         {
@@ -219,6 +287,33 @@ public sealed class ArchivePage : ContentPage
 
         var card = Surfaces.Row(body, Thickness.Zero);
         card.SetBinding(SemanticProperties.DescriptionProperty, nameof(ArchiveRaceRow.AccessibleText));
+
+        // Tapping a race opens it in full: classification, qualifying and pit stops, fetched on demand.
+        var tap = new TapGestureRecognizer();
+        tap.Tapped += async (sender, _) =>
+        {
+            if (sender is not BindableObject { BindingContext: ArchiveRaceRow race })
+            {
+                return;
+            }
+
+            try
+            {
+                if (_services.GetService(typeof(Races.RaceDetailPage)) is not Races.RaceDetailPage page)
+                {
+                    return;
+                }
+
+                page.Select(race.SeasonNumber, race.RoundNumber);
+                await Shell.Current.Navigation.PushAsync(page);
+            }
+            catch (Exception exception)
+            {
+                Diagnostics.Write("PAGE", exception, "archive -> race detail");
+            }
+        };
+
+        card.GestureRecognizers.Add(tap);
         return card;
     }
 

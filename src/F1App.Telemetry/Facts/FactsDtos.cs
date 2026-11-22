@@ -55,9 +55,66 @@ internal sealed record JolpicaSeasonRace(
     [property: JsonPropertyName("raceName")] string? RaceName,
     [property: JsonPropertyName("Results")] List<JolpicaSeasonResult>? Results);
 
+/// <summary>One race in detail: <c>/{season}/{round}/results.json</c>.</summary>
+internal sealed record JolpicaRaceDetailResultsPayload(
+    [property: JsonPropertyName("MRData")] JolpicaRaceDetailResultsData? MrData);
+
+internal sealed record JolpicaRaceDetailResultsData(
+    [property: JsonPropertyName("RaceTable")] JolpicaRaceDetailTable? RaceTable);
+
+internal sealed record JolpicaRaceDetailTable(
+    [property: JsonPropertyName("Races")] List<JolpicaRaceDetailRace>? Races);
+
+internal sealed record JolpicaRaceDetailRace(
+    [property: JsonPropertyName("raceName")] string? RaceName,
+    [property: JsonPropertyName("date")] string? Date,
+    [property: JsonPropertyName("Circuit")] JolpicaVaultCircuit? Circuit,
+    [property: JsonPropertyName("Results")] List<JolpicaSeasonResult>? Results);
+
+/// <summary>Qualifying for one race: <c>/{season}/{round}/qualifying.json</c>.</summary>
+internal sealed record JolpicaRaceDetailQualifyingPayload(
+    [property: JsonPropertyName("MRData")] JolpicaRaceDetailQualifyingData? MrData);
+
+internal sealed record JolpicaRaceDetailQualifyingData(
+    [property: JsonPropertyName("RaceTable")] JolpicaQualifyingTable? RaceTable);
+
+internal sealed record JolpicaQualifyingTable(
+    [property: JsonPropertyName("Races")] List<JolpicaQualifyingRace>? Races);
+
+internal sealed record JolpicaQualifyingRace(
+    [property: JsonPropertyName("QualifyingResults")] List<JolpicaQualifyingResult>? QualifyingResults);
+
+internal sealed record JolpicaQualifyingResult(
+    [property: JsonPropertyName("position")] string? Position,
+    [property: JsonPropertyName("Driver")] JolpicaDriverRef? Driver,
+    [property: JsonPropertyName("Q1")] string? Q1,
+    [property: JsonPropertyName("Q2")] string? Q2,
+    [property: JsonPropertyName("Q3")] string? Q3);
+
+/// <summary>Pit stops for one race: <c>/{season}/{round}/pitstops.json</c>.</summary>
+internal sealed record JolpicaRaceDetailPitStopsPayload(
+    [property: JsonPropertyName("MRData")] JolpicaRaceDetailPitStopsData? MrData);
+
+internal sealed record JolpicaRaceDetailPitStopsData(
+    [property: JsonPropertyName("RaceTable")] JolpicaPitStopsTable? RaceTable);
+
+internal sealed record JolpicaPitStopsTable(
+    [property: JsonPropertyName("Races")] List<JolpicaPitStopsRace>? Races);
+
+internal sealed record JolpicaPitStopsRace(
+    [property: JsonPropertyName("PitStops")] List<JolpicaPitStop>? PitStops);
+
+internal sealed record JolpicaPitStop(
+    [property: JsonPropertyName("driverId")] string? DriverId,
+    [property: JsonPropertyName("lap")] string? Lap,
+    [property: JsonPropertyName("stop")] string? Stop,
+    [property: JsonPropertyName("duration")] string? Duration);
+
 internal sealed record JolpicaSeasonResult(
     [property: JsonPropertyName("position")] string? Position,
     [property: JsonPropertyName("positionText")] string? PositionText,
+    [property: JsonPropertyName("points")] string? Points,
+    [property: JsonPropertyName("laps")] string? Laps,
     [property: JsonPropertyName("grid")] string? Grid,
     [property: JsonPropertyName("status")] string? Status,
     [property: JsonPropertyName("Driver")] JolpicaDriverRef? Driver,
@@ -106,4 +163,7 @@ internal sealed record JolpicaVaultTime(
 [JsonSerializable(typeof(JolpicaChampionPayload))]
 [JsonSerializable(typeof(JolpicaRaceVaultPayload))]
 [JsonSerializable(typeof(JolpicaSeasonResultsPayload))]
+[JsonSerializable(typeof(JolpicaRaceDetailResultsPayload))]
+[JsonSerializable(typeof(JolpicaRaceDetailQualifyingPayload))]
+[JsonSerializable(typeof(JolpicaRaceDetailPitStopsPayload))]
 internal sealed partial class FactsJsonContext : JsonSerializerContext;

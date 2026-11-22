@@ -16,6 +16,8 @@
   <ItemGroup Label="Runtime">
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="11.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Debug" Version="11.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="11.0.1" />
+    <PackageVersion Include="Polly.Core" Version="8.9.1" />
   </ItemGroup>
 
   <ItemGroup Label="Test">

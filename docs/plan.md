@@ -114,6 +114,32 @@ translated literally; native conventions were not.
 6. **Verify on a device.** Every claim above is "constructs and walks", not "looks native". That gap is the
    remaining blocker, and no build log can close it.
 
+## Responsive layout (ADR-017) — DONE 2026-11-22
+
+`Responsive.Panes` gives a two-pane arrangement on a wide window and a stacked column on a phone, applied to
+Paddock, Track, Season and Archive; the shell and the pages share one `IsPhone` switch. The arrangement also
+follows the **live** width: a `WidthSwitch` per page rebuilds only when the width crosses the 900 pt breakpoint,
+verified by the stress run resizing 1500 -> 700 -> 1500 pt with a walk after each crossing.
+
+## Screenshots close most of this gap on desktop
+
+`F1APP_SMOKE=1 F1APP_SHOTS=1` now saves a PNG of every screen to the app cache (`shots/`) as the walk visits it,
+so the desktop UI can be looked at on a machine nobody can touch. Eight defects were found and fixed in the first
+pass: the wide layout never applied (`WidthSwitch` compared against the first observed width instead of the one
+that was built), the Settings theme picker clipped its text (a forced height on WinUI), dates rendered in two
+cultures on one screen (`Kup 08 Map` next to `Sun 29 Nov`), the Season hero stretched down an empty column, the
+Paddock opened with an empty dossier while its duel lines already named a driver, the 93 px headshot was
+fill-cropped to a chin, the race-control strip showed four identical `CLEAR` lines because *CLEAR is itself a
+flag value*, and the decade picker was squeezed to its text width.
+
+## Real clicks, not just navigation
+
+`F1APP_CLICK=1` sends a **real mouse click** at a pit-wall tab's screen position (`SetCursorPos` +
+`mouse_event` on the control's transformed bounds, then `ClientToScreen`). This exists because the reported
+NEWS crash did not exist on the synthetic path: calling the handler directly was fine, a pointer click killed
+the app in ~5 s. The cause was a hidden `CollectionView` being repopulated, which is now recorded in
+`docs/agent/findings.md`.
+
 ## Visual checks queued (cannot be answered by a build log)
 
 These are recorded so they are checked once, on a device, instead of being re-discovered as bugs. Each one is
@@ -132,8 +158,9 @@ something I could only verify as "the file exists and the build accepts it".
   as a native list, or as a cramped table, is only answerable by eye.
 - **Archive scroll.** 1,158 rows in one `CollectionView`. MAUI virtualises, but nobody has scrolled it on a
   phone; if it stutters the answer is incremental loading, not a smaller vault.
-- **Bottom tab bar.** Never drawn — the phone shell is only exercised through `F1APP_PHONE=1` on Windows. Tab
-  labels for five destinations, and whether "More" is discoverable, need a phone.
+- **Bottom tab bar.** Never drawn — the phone shell is only exercised through `F1APP_PHONE=1` on Windows. A
+  forced-phone screenshot can now be captured the same way, but a real phone's gesture bar, status bar and
+  thumb reach still need hardware.
 - **Light theme overall.** Contrast-checked on paper, unseen in practice.
 
 **Reference:** `docs/design/pitwall-prototype-4.html` (5 tabs: Season, Pit wall, Paddock, Archive, Media) is the
@@ -148,10 +175,13 @@ visual target; native conventions win where the two disagree.
   from it. One row per race (the P1 result), one request per season (ADR-013).
 * **Seasons and races:** the Season hub's year picker now also spans 2023 → next year (every season OpenF1
   publishes). A 1950→ calendar browser is the Archive's job now, and it is done.
-* **Race details (still open):** full classifications, qualifying, pit stops and fastest laps come from
-  `/{season}/{round}/results.json` etc. Per-race requests multiply fast (24 races × 4 endpoints ×
-  77 seasons ≈ 7 400 requests) — this needs an explicit one-off sync with progress, and the per-round screens
-  to show it. Not built; the vault stores the winner row only.
+* **Race details: DONE 2026-11-22 as on-demand, not a bulk sync.** Tapping a race in the Archive opens it in
+  full - classification (position, driver, team, laps, status, points), qualifying (Q1/Q2/Q3) and pit stops
+  (lap, stop number, stationary time) - from three Jolpica requests, cached in SQLite so a second open costs
+  nothing. The bulk alternative (77 seasons x 24 races x 3 endpoints) stays rejected: it is ~5 500 requests for
+  data almost nobody opens, and every race is reachable on demand instead.
+* **What the detail screen does not show:** fastest-lap data beyond the classification's `FastestLap` block and
+  lap charts. Those need per-lap endpoints at one request per race each and are still open.
 * **What "all details" cannot mean:** lap-by-lap telemetry (`car_data`, `location`) exists only from 2023 (OpenF1).
   For 1950–2022 the archive can show classification, grid, points, fastest lap and pit stops — not telemetry.
   Any screen implying otherwise would be fabricating.
@@ -189,19 +219,20 @@ Source: <https://openf1.org/docs/> (read 2026-11-22). Probes below were made aga
 
 ## Used today
 
-`car_data` · `drivers` · `intervals` · `laps` · `location` · `pit` · `position` · `sessions` · `stints`
-(plus `meetings`, added for the circuit icons and flags).
+`car_data` · `drivers` · `intervals` · `laps` · `location` · `pit` · `position` · `race_control` ·
+`sessions` · `session_result` · `starting_grid` · `overtakes` · `championship_drivers` ·
+`stints` · `weather` · `meetings` (icons, flags, circuit type).
 
 ## Documented but unused, with what each would buy
 
 | Endpoint | Measured (session 11420) | What it would enable | Cost / risk |
 | --- | --- | --- | --- |
-| `weather` | **148 rows** (air/track temp, humidity, pressure, rainfall, wind) | A real track-conditions strip on Timing and Pit wall; the rain flag changes strategy reading | One request per session; fields are per-minute so it must be sampled, not replayed frame by frame |
-| `race_control` | **110 rows** (SessionStatus, CarEvent, Flag, SafetyCar, DRS; message, lap, scope, sector) | A race-control feed: yellow/SC/VSC, investigations, penalties - the single biggest missing context on every timing screen | One request per session; needs a category filter or the feed buries the flags |
-| `session_result` | **22 rows** (position, duration, gap, laps, **points**, dnf/dns/dsq) | An official classification for Results instead of one derived from the last position sample; points power any standings arithmetic | One request per session; published "a few minutes after" official results, so a live session has none |
-| `overtakes` | **361 rows** (overtaker, overtaken, position, date) | "Overtakes of the race" on Results or Archive; a count per driver for the Facts record book | Docs warn the data "may be incomplete"; 361 rows per race is fine to cache |
-| `starting_grid` | **empty for the race (11420), 20 rows for qualifying (11416)** | Grid vs finish delta - the cheapest honest "gained/lost places" stat | **Keyed by the qualifying session, not the race** - measured, and it returns an empty list (not an error) if asked with the race key |
-| `championship_drivers` (beta) | **25 rows** (position/points start → current) | In-race championship swings: "Verstappen gains 2 places in the title fight" | Beta; race sessions only. **Verified to reconcile**: `position_start`/`points_start` matched Jolpica's standings on all 22 shared drivers (0 mismatches). `*_current` includes the race itself, so the two only agree like-for-like |
+| ~~`weather`~~ **done 2026-11-22** | **148 rows** (air/track temp, humidity, pressure, rainfall, wind) | The Pit wall header now shows "air 27.8 °C · track 52.5 °C · 58% humidity · wind 2.4 m/s · dry" from the session's latest sample | One request per session; the latest sample is what a screen shows, so the history is fetched and discarded. Extending it to Timing is still open |
+| ~~`race_control`~~ **done 2026-11-22** | **110 rows** (SessionStatus, CarEvent, Flag, SafetyCar, DRS; message, lap, scope, sector) | The Pit wall shows the four most recent messages above the table ("lap 61 · SafetyCar · SAFETY CAR DEPLOYED"), verbatim and trimmed | One request per session. Not yet filtered by category, so a busy session can fill all four slots with car events - a flag-first sort is the obvious next step |
+| ~~`session_result`~~ **done 2026-11-22** | **22 rows** (position, duration, gap, laps, **points**, dnf/dns/dsq) | Results now carries an OFFICIAL column: points and DNF/DNS/DSQ from the FIA classification, joined to the derived table by driver number | Additive, not a replacement - the derived table keeps sectors, tyres and pits. Published a few minutes after the session, so the column is empty until then and the status line says so |
+| ~~`overtakes`~~ **done 2026-11-22** | **361 rows** (overtaker, overtaken, position, date) | The Results OFFICIAL column ends with "4 made, 2 lost" per driver | Counted as overtakes, never "on-track passes": the provider mixes in pit-stop and penalty position changes, and warns the list may be incomplete |
+| ~~`starting_grid`~~ **done 2026-11-22** | **empty for the race (11420), 20 rows for qualifying (11416)** | Results appends "places +2" to the OFFICIAL column: grid vs finish, only where both are known | **Keyed by the qualifying session, not the race** - the Results screen resolves the sibling qualifying slot from the weekend schedule before asking. A race weekend with no qualifying session gets no delta at all |
+| ~~`championship_drivers`~~ **done 2026-11-22** | **25 rows** (position/points start → current) | The Paddock dossier shows "title P3 · 410 pts · +18 this race · 2 places gained" | Beta; race sessions only, so other sessions leave the line empty. Verified to reconcile with Jolpica (0 mismatches on 22 drivers when compared like-for-like) |
 | `championship_teams` (beta) | **11 rows** | Same for constructors | Same as above; **verified**: 10 of 11 teams matched Jolpica exactly (the 11th, "Racing Bulls", needs a name map) |
 | `team_radio` | **21 rows** (recording_url per driver) | Radio clips on Pit wall | Recordings are hosted on `livetiming.formula1.com` - the same host as the SignalR hub ADR-009 keeps off, so the licensing question is the same and it is **not** an open asset |
 | `meetings` | **27 rows for 2026** (`circuit_image`, `country_flag`, `circuit_type`, `gmt_offset`, `is_cancelled`) | Already used for icons and flags; still unused: `is_cancelled` (a cancelled round should not read as "upcoming") and `gmt_offset` | Free - one request per season |
@@ -232,10 +263,14 @@ standings the app already shows, and the delta between the two fields is the in-
 
 ## If this list is worked through, the order that pays first
 
-1. `session_result` on Results - replaces a derived classification with the official one, and brings points.
-2. `race_control` on Pit wall and Timing - flags and safety cars are the context every timing column lacks.
-3. `weather` on Timing - conditions explain lap-time drift that currently looks like noise.
-4. `starting_grid` (+ `session_result`) for gained/lost places, keyed off the qualifying session.
-5. `overtakes` for a Facts record; then `championship_*`, which **is** usable: the start snapshot matches Jolpica
+1. ~~`session_result` on Results~~ - **done 2026-11-22** as an added column (points + classified status) rather
+   than a replacement; fully replacing the derived table is still open and would lose sectors/tyres/pits.
+2. ~~`race_control` on Pit wall and Timing~~ - **done on the Pit wall** 2026-11-22; the Timing tower does not show
+   it yet, and the strip does not yet prioritise flags over car events.
+3. ~~`weather` on Timing~~ - **done on the Pit wall** 2026-11-22; extending the same line to the Timing tower is
+   the remaining half.
+4. ~~`starting_grid` (+ `session_result`) for gained/lost places~~ - **done 2026-11-22**, keyed off the sibling
+   qualifying session as measured.
+5. ~~`overtakes` for a Facts record~~ - **done 2026-11-22** on Results; then `championship_*`, which **is** usable: the start snapshot matches Jolpica
    exactly, so a delta (points_current - points_start) is a real in-race swing and not a competing truth.
 6. `team_radio` - last, and only if the licensing question is answered; it is F1-hosted audio, not open data.

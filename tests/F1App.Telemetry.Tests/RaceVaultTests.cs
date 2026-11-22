@@ -422,3 +422,123 @@ public sealed class OnThisDayTests
         Assert.Equal(2025, Assert.Single(found).Season);
     }
 }
+
+public sealed class RaceDetailClientTests
+{
+    private static readonly string ClassificationPayload = """
+        { "MRData": { "RaceTable": { "Races": [ {
+            "raceName": "Brazilian Grand Prix", "date": "2026-11-08",
+            "Circuit": { "circuitId": "interlagos", "circuitName": "Autódromo José Carlos Pace" },
+            "Results": [
+              { "position": "1", "positionText": "1", "points": "25", "laps": "71", "grid": "1",
+                "status": "Finished",
+                "Driver": { "driverId": "norris", "code": "NOR", "givenName": "Lando", "familyName": "Norris" },
+                "Constructor": { "constructorId": "mclaren", "name": "McLaren" } },
+              { "position": "18", "positionText": "R", "points": "0", "laps": "12", "grid": "9",
+                "status": "Collision",
+                "Driver": { "driverId": "x", "givenName": "A", "familyName": "Driver" },
+                "Constructor": { "constructorId": "c", "name": "Team" } }
+            ] } ] } } }
+        """;
+
+    private static readonly string QualifyingPayload = """
+        { "MRData": { "RaceTable": { "Races": [ { "QualifyingResults": [
+            { "position": "1", "Driver": { "givenName": "Lando", "familyName": "Norris" },
+              "Q1": "1:30.939", "Q2": "1:29.207", "Q3": "1:28.900" }
+        ] } ] } } }
+        """;
+
+    private static readonly string PitStopsPayload = """
+        { "MRData": { "RaceTable": { "Races": [ { "PitStops": [
+            { "driverId": "hamilton", "lap": "14", "stop": "1", "time": "14:24:17", "duration": "24.394" }
+        ] } ] } } }
+        """;
+
+    private static JolpicaRaceDetailClient Client(StubHttpHandler handler) =>
+        new(new HttpClient(handler), new RequestGate(TimeSpan.FromMilliseconds(1), TimeProvider.System));
+
+    [Fact]
+    public async Task GetAsync_ReadsClassificationQualifyingAndPitStops()
+    {
+        var handler = new StubHttpHandler()
+            .Map("2026/20/results.json", HttpStatusCode.OK, ClassificationPayload)
+            .Map("2026/20/qualifying.json", HttpStatusCode.OK, QualifyingPayload)
+            .Map("2026/20/pitstops.json", HttpStatusCode.OK, PitStopsPayload);
+
+        var snapshot = UnionAssert.Success(await Client(handler).GetAsync(2026, 20, CancellationToken.None));
+
+        Assert.Equal("Brazilian Grand Prix", snapshot.RaceName);
+        Assert.Equal(new DateOnly(2026, 11, 8), snapshot.Date);
+        Assert.Equal(2, snapshot.Classification.Length);
+        Assert.Equal("R", snapshot.Classification[1].Position);
+        Assert.Equal(25, snapshot.Classification[0].Points);
+        Assert.Equal("Collision", snapshot.Classification[1].Status);
+
+        Assert.Single(snapshot.Qualifying);
+        Assert.Equal("1:28.900", snapshot.Qualifying[0].Q3);
+
+        Assert.Single(snapshot.PitStops);
+        Assert.Equal(14, snapshot.PitStops[0].Lap);
+        Assert.Equal(24.394, snapshot.PitStops[0].DurationSeconds);
+    }
+
+    [Fact]
+    public async Task GetAsync_TreatsMissingQualifyingAndPitStopsAsUnpublished()
+    {
+        // A 1970 race has neither: the sections are empty, and the screen must say "not published".
+        var handler = new StubHttpHandler()
+            .Map("1970/5/results.json", HttpStatusCode.OK, ClassificationPayload)
+            .Map("qualifying.json", HttpStatusCode.NotFound, "{}")
+            .Map("pitstops.json", HttpStatusCode.NotFound, "{}");
+
+        var snapshot = UnionAssert.Success(await Client(handler).GetAsync(1970, 5, CancellationToken.None));
+
+        Assert.Empty(snapshot.Qualifying);
+        Assert.Empty(snapshot.PitStops);
+        Assert.Equal(2, snapshot.Classification.Length);
+    }
+
+    [Fact]
+    public async Task GetAsync_ReportsAFailingClassification()
+    {
+        var handler = new StubHttpHandler().Map("results.json", HttpStatusCode.ServiceUnavailable, "down");
+
+        UnionAssert.Failure(await Client(handler).GetAsync(2026, 20, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task GetAsync_ServesASecondOpenFromCache()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"f1app-race-{Guid.NewGuid():N}.db");
+        try
+        {
+            var handler = new StubHttpHandler()
+                .Map("2026/20/results.json", HttpStatusCode.OK, ClassificationPayload)
+                .Map("2026/20/qualifying.json", HttpStatusCode.OK, QualifyingPayload)
+                .Map("2026/20/pitstops.json", HttpStatusCode.OK, PitStopsPayload);
+
+            var client = new JolpicaRaceDetailClient(
+                new HttpClient(handler),
+                new RequestGate(TimeSpan.FromMilliseconds(1), TimeProvider.System),
+                new F1App.Telemetry.Providers.SqlitePayloadCache(path),
+                TimeProvider.System);
+
+            await client.GetAsync(2026, 20, CancellationToken.None);
+            var requests = handler.Requests.Count;
+            await client.GetAsync(2026, 20, CancellationToken.None);
+
+            Assert.Equal(3, requests);
+            Assert.Equal(requests, handler.Requests.Count);
+        }
+        finally
+        {
+            try
+            {
+                File.Delete(path);
+            }
+            catch (IOException)
+            {
+            }
+        }
+    }
+}

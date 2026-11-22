@@ -41,14 +41,15 @@ Jolpica ┘   (per provider)                   └─> SQLite caches ─> pages
 | --- | --- |
 | Season | Jolpica calendar via SQLite-backed `IRaceCalendarStore` |
 | Weekend | OpenF1 `/sessions` for the current meeting + `WeekendPhase` closed hierarchy |
-| Pit wall | classification (OpenF1 laps/position/intervals/stints/pit/drivers) + live replay samples |
+| Pit wall | classification (OpenF1 laps/position/intervals/stints/pit/drivers) + track conditions (`weather`) + race-control messages + live replay samples |
 | Timing | replay samples only |
 | Track | circuit atlas, geometry from one car's recorded GPS lap, provider track icon + flag, Commons aerial photo |
-| Results | six OpenF1 endpoints folded into `SessionTiming` |
+| Results | six OpenF1 endpoints folded into `SessionTiming`, plus `session_result` for official points and status, `starting_grid` (via the qualifying session) for places gained, and `overtakes` for passes made and lost |
 | Strategy | `stints` + `drivers` |
 | Compare | replay samples, speed against elapsed time |
-| Paddock | session driver list + the provider's headshot (Commons fallback) + teammate duels from cached season classifications |
+| Paddock | session driver list + the provider's headshot (Commons fallback) + teammate duels from cached season classifications + the race's championship swing (`championship_drivers`, beta) |
 | Archive | Jolpica `/{season}/results/1.json` vault in SQLite: every race since 1950 with its winner, all-time win records and "on this day", both computed from the same rows |
+| Race detail | Jolpica `/{season}/{round}/results|qualifying|pitstops.json` on demand, cached as raw payloads |
 | Facts | Jolpica champions, persisted |
 | News | nine public RSS/Atom feeds (r/formula1 removed 2026-11-22: Reddit now requires a login) |
 | Settings | theme, live-feed opt-in, diagnostics |
@@ -59,6 +60,10 @@ Jolpica ┘   (per provider)                   └─> SQLite caches ─> pages
 | --- | --- | --- |
 | Phone | `TabBar`, five bottom tabs | Season, Pit wall, Archive, Paddock, More |
 | Desktop / Mac | flyout, five groups | every screen, grouped Live / Championship / Circuit / People / Media |
+
+Content is shared and the arrangement is not: `Responsive.Panes` draws two columns on a wide window and one
+stacked column on a phone (ADR-017), and `Responsive.IsPhone` is the switch both the shell and the pages read. A page's arrangement follows the live
+width through `WidthSwitch`, which rebuilds only when the 900 pt breakpoint is crossed.
 
 The nine non-tab screens are registered routes pushed from `MorePage` on phones and shown directly in the flyout
 on desktop; both read the same `AppShell.Secondary` table (ADR-014). `F1APP_PHONE=1` forces the phone shell so

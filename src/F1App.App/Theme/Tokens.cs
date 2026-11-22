@@ -50,6 +50,15 @@ public static class Tokens
     public static double MinTouchTarget =>
         DeviceInfo.Current.Platform == DevicePlatform.iOS ? 44 : 48;
 
+    /// <summary>
+    /// Smallest height a picker is allowed to be.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately a minimum and not a request: on WinUI the picker draws its own inner control, and forcing
+    /// a height clips the selected text (measured on the Settings theme picker).
+    /// </remarks>
+    public const double MinPickerHeight = 32;
+
     /// <summary>Gap kept between adjacent touchables.</summary>
     public const double TouchSpacing = 8;
 
@@ -72,4 +81,30 @@ public static class Tokens
         Radius = 14,
         Offset = new Point(0, 4),
     };
+}
+
+/// <summary>
+/// How the app writes a date.
+/// </summary>
+/// <remarks>
+/// One culture for every date in the app. The screens are English-only and every number beside a date is
+/// invariant, so letting the calendar follow the device culture produced "Kup 08 Map" next to "Sun 29 Nov" on
+/// the same screen - a defect a screenshot caught and no test could. A user on an unusual culture gets English
+/// month names, consistently, rather than half the screen in each.
+/// </remarks>
+public static class Dates
+{
+    /// <summary>Culture used for every user-facing date.</summary>
+    public static readonly System.Globalization.CultureInfo Culture =
+        System.Globalization.CultureInfo.InvariantCulture;
+
+    /// <summary>"Mon 02 Mar · 15:00" in local time.</summary>
+    public static string DayTime(DateTimeOffset value) =>
+        value.ToLocalTime().ToString("ddd dd MMM · HH:mm", Culture);
+
+    /// <summary>"02 Mar 2026".</summary>
+    public static string Day(DateOnly value) => value.ToString("dd MMM yyyy", Culture);
+
+    /// <summary>"Sat 02 Mar 2026".</summary>
+    public static string Full(DateOnly value) => value.ToString("ddd dd MMM yyyy", Culture);
 }

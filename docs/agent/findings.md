@@ -69,3 +69,58 @@ Evidence, measurements and dead ends. Newest last.
   11 constructors matched ("Racing Bulls" needs a name map). The OpenF1 delta is therefore usable as a real
   in-race swing. Lesson: when two sources "disagree", check whether the fields describe the same instant before
   concluding the sources conflict.
+- 2026-11-22 `weather` implemented: one request per session, latest sample only. The formatter (`TrackConditions
+  .Describe`) is unit-tested for full, partial and empty field sets so an unpublishable field is left out rather
+  than shown as 0; the JSON parse is tested against the provider's documented payload shape.
+- 2026-11-22 `session_result` implemented on Results as an **added** OFFICIAL column (points, DNF/DNS/DSQ),
+  joined by driver number, rather than replacing the derived table - replacing it would drop sectors, tyre age
+  and pit counts that the lap data supplies. An empty array (published-nothing) is a normal answer, tested.
+- 2026-11-22 `race_control` implemented on the Pit wall: the four newest messages, verbatim, trimmed at 48 chars.
+  Known limitation recorded rather than hidden: with no category filter a busy session can fill all four slots
+  with car events, so a yellow flag can scroll out of the strip; sorting flags/safety cars first is the fix.
+- 2026-11-22 `starting_grid` implemented: Results resolves the qualifying slot from the same `WeekendSchedule`
+  before asking, because the race key answers an empty list (measured). Delta appears only when grid and finish
+  are both known, so an unclassified car shows no invented "-0".
+- 2026-11-22 responsive layout (ADR-017): `Responsive.Panes` applied to Paddock, Track, Season, Archive. Two
+  defects caught by the walk while building it - adding a pane whose parent was the RefreshView ("Grid is already
+  a child of RefreshView"), and adding the list grid rather than the RefreshView that owns it. Both verified
+  fixed: wide 13/13, phone 23/23, stress (36 theme-switched navigations) 0 exceptions.
+- 2026-11-22 `overtakes` implemented on Results ("4 made, 2 lost" appended to OFFICIAL). Deliberately not called
+  "on-track passes": the provider's own docs say the list mixes pit-stop/penalty position changes and may be
+  incomplete, so the wording follows the data rather than the ideal.
+- 2026-11-22 championship swing implemented in the Paddock dossier ("title P3 · 410 pts · +18 this race ·
+  2 places gained"). Built on the beta endpoint that had been verified to reconcile with Jolpica. My own test
+  expectation was wrong first (I asserted a 5th-to-3rd move as three places); the code was right and the test was
+  corrected - the second time this session that an assertion, not the implementation, was the defect.
+- 2026-11-22 width-driven arrangement: `WidthSwitch` fires only when the width crosses 900 pt, so a resize storm
+  does not rebuild content repeatedly (a rebuild is a full page construction). The stress harness now resizes the
+  window 700 -> 1500 pt and walks Season and Paddock after each: 0 exceptions, 0 COMException.
+- 2026-11-22 race detail (ADR-018): three Jolpica requests per race on demand, cached as raw payloads. Live probe
+  2026 round 20: results 22, qualifying 22, pit stops 30. Qualifying exists from 1994 and pit stops from 2012, so
+  an empty section is "not published" - tested with a 1970 race whose optional endpoints 404.
+- 2026-11-22 **screenshots**: `F1APP_SHOTS=1` captures a PNG of each screen during the walk. Desktop defects it
+  found, all fixed and re-verified by a second screenshot: (1) `WidthSwitch` took the first observed width as its
+  baseline, so the wide layout was never applied and the Season hero sat under the list on a 1400 pt window;
+  (2) a forced `HeightRequest` on the theme Picker clipped "Dark" to half its height on WinUI; (3) dates used
+  `CurrentCulture` in some places and invariant in others, giving "Kup 08 Map" beside "Sun 29 Nov"; (4) the hero
+  card stretched down an empty column; (5) Paddock opened with `—` as the dossier while the duel lines already
+  described a driver; (6) the provider headshot (93 px) was `AspectFill`-cropped to a chin; (7) race control
+  showed four identical `CLEAR IN TRACK SECTOR` lines - `CLEAR` is itself a flag value, so "has a flag" ranked it
+  first; (8) the archive decade picker collapsed to its text width.
+- Lesson: "constructs and walks" hid all eight. A screenshot is cheap and found what no assertion did.
+- 2026-11-22 **crash on the pit-wall NEWS tab** (`0xc000027b` in `CoreMessagingXP.dll`, identical fault offset
+  in three user crashes and one reproduction). Root cause: **filling a CollectionView that is not on screen**.
+  `RebuildNews()` populated both the News and the Media lists on every refresh; pressing NEWS refreshes the feeds,
+  the hidden Media view received its two items, and XAML died inside its input machinery. Bisected in the harness:
+  - real mouse click at the tab's screen position (`F1APP_CLICK=1`) reproduces in ~5 s; calling `ShowSection`
+    directly does **not** - the crash only exists on the pointer path
+  - `ShowSection` split: visibility only, colours only, both = fine; adding `EnsureSectionLoaded` = crash
+  - refresh with news only (40 items) = fine; refresh with media only (2 items) = crash
+  Fix: `RebuildNews()` fills only the list belonging to the visible section; switching tabs already refills the
+  one it reveals. Verified by real clicks on NEWS → TIMING → MEDIA → NEWS: walk completes, 0 Application Error
+  events, twice in a row, and a screenshot of the populated NEWS tab.
+- Lesson: a synthetic handler call is not a click. Two days of "the walk visits every screen" hid an input-path
+  crash that a real pointer event produced immediately.
+- Found while bisecting, not fixed: `Themes.Changed` (a static event) and `NewsViewModel.PropertyChanged`
+  (a singleton view model) are subscribed by every page constructor and never unsubscribed, so closed pages stay
+  reachable and rebuild their content. Recorded as an open item in tasks.md.

@@ -26,7 +26,7 @@ public sealed class ResultsPage : ContentPage
             TextColor = Themes.Current.TextPrimary,
             TitleColor = Themes.Current.TextSecondary,
             BackgroundColor = Themes.Current.SurfaceMuted,
-            HeightRequest = Tokens.MinTouchTarget,
+            MinimumHeightRequest = Tokens.MinPickerHeight,
             HorizontalOptions = LayoutOptions.Fill,
         };
         _picker.SetBinding(Picker.ItemsSourceProperty, nameof(ResultsViewModel.SessionNames));
@@ -107,9 +107,9 @@ public sealed class ResultsPage : ContentPage
 
     private View BuildContent()
     {
-        // The palette swap rebuilds this page; a control created in the constructor still has its old
-        // parent, and MAUI refuses to add it twice.
-        (_picker.Parent as Layout)?.Remove(_picker);
+        // Controls created once in the constructor must leave the old tree before the rebuild.
+        Surfaces.Detach(_picker, _replayButton);
+
 
         var header = new VerticalStackLayout
         {
@@ -155,9 +155,9 @@ public sealed class ResultsPage : ContentPage
 
     private static View BuildColumnHeader()
     {
-        var grid = Grid(32, 54, 82, 58, 58, 58, 72, 68, 30);
+        var grid = Grid(32, 54, 82, 58, 58, 58, 72, 68, 30, 84);
 
-        string[] captions = ["P", "DRV", "BEST LAP", "S1", "S2", "S3", "GAP", "TYRE", "PIT"];
+        string[] captions = ["P", "DRV", "BEST LAP", "S1", "S2", "S3", "GAP", "TYRE", "PIT", "OFFICIAL"];
 
         for (var i = 0; i < captions.Length; i++)
         {
@@ -176,7 +176,7 @@ public sealed class ResultsPage : ContentPage
 
     private static View BuildRow()
     {
-        var grid = Grid(32, 54, 82, 58, 58, 58, 72, 68, 30);
+        var grid = Grid(32, 54, 82, 58, 58, 58, 72, 68, 30, 84);
         grid.Padding = new Thickness(Tokens.Space2, Tokens.Space1);
         grid.SetBinding(SemanticProperties.DescriptionProperty, nameof(TimingDisplayRow.AccessibleText));
 
@@ -199,6 +199,7 @@ public sealed class ResultsPage : ContentPage
         grid.Add(Cell(nameof(TimingDisplayRow.Gap), Themes.Current.TextSecondary, TextAlignment.Start), 6);
         grid.Add(Cell(nameof(TimingDisplayRow.Tyre), Themes.Current.TextSecondary, TextAlignment.Start), 7);
         grid.Add(Cell(nameof(TimingDisplayRow.Pits), Themes.Current.TextSecondary, TextAlignment.End), 8);
+        grid.Add(Cell(nameof(TimingDisplayRow.Official), Themes.Current.TextSecondary, TextAlignment.End), 9);
 
         return grid;
     }

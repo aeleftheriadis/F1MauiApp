@@ -45,7 +45,7 @@ public sealed class SettingsPage : ContentPage
             TextColor = Themes.Current.TextPrimary,
             TitleColor = Themes.Current.TextSecondary,
             BackgroundColor = Themes.Current.SurfaceMuted,
-            HeightRequest = Tokens.MinTouchTarget,
+            MinimumHeightRequest = Tokens.MinPickerHeight,
             ItemsSource = _viewModel.ThemeModes,
         };
         themePicker.SetBinding(Picker.SelectedIndexProperty, nameof(SettingsViewModel.ThemeIndex), BindingMode.TwoWay);

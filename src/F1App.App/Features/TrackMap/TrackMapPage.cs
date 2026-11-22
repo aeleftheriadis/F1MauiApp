@@ -34,6 +34,7 @@ public sealed class TrackMapPage : ContentPage, IDisposable
     private SKPath? _centreline;
     private TrackOutline? _outlineSource;
     private bool _loaded;
+    private readonly WidthSwitch _width;
     private bool _disposed;
 
     public TrackMapPage(CircuitMapViewModel viewModel, TelemetrySnapshotStore store)
@@ -44,6 +45,7 @@ public sealed class TrackMapPage : ContentPage, IDisposable
         _viewModel = viewModel;
         _store = store;
         BindingContext = viewModel;
+        _width = new WidthSwitch(Responsive.IsWideAt(Width), () => Content = BuildContent());
         Title = "Track";
         BackgroundColor = Themes.Current.Background;
         SafeAreaEdges = SafeAreaEdges.Container;
@@ -57,7 +59,7 @@ public sealed class TrackMapPage : ContentPage, IDisposable
             TextColor = Themes.Current.TextPrimary,
             TitleColor = Themes.Current.TextSecondary,
             BackgroundColor = Themes.Current.SurfaceMuted,
-            HeightRequest = Tokens.MinTouchTarget,
+            MinimumHeightRequest = Tokens.MinPickerHeight,
         };
         _picker.SetBinding(Picker.ItemsSourceProperty, nameof(CircuitMapViewModel.Circuits));
         _picker.SelectedIndexChanged += async (_, _) =>
@@ -85,6 +87,13 @@ public sealed class TrackMapPage : ContentPage, IDisposable
                 _canvas.InvalidateSurface();
             }
         };
+    }
+
+    /// <inheritdoc />
+    protected override void OnSizeAllocated(double width, double height)
+    {
+        base.OnSizeAllocated(width, height);
+        _width.Observe(width);
     }
 
     protected override void OnAppearing()
@@ -148,6 +157,9 @@ public sealed class TrackMapPage : ContentPage, IDisposable
 
     private View BuildContent()
     {
+        // Controls created once in the constructor must leave the old tree before the rebuild.
+        Surfaces.Detach(_picker, _canvas);
+
         var header = new VerticalStackLayout
         {
             Padding = new Thickness(Tokens.Space4, Tokens.Space3),
@@ -193,6 +205,12 @@ public sealed class TrackMapPage : ContentPage, IDisposable
                 Surfaces.StatusBar(_viewModel, nameof(CircuitMapViewModel.Status), nameof(CircuitMapViewModel.IsBusy)),
             },
         };
+
+        // Wide: the map takes the room and the facts sit beside it. Phone: facts above the map, as before.
+        if (Responsive.IsWide)
+        {
+            return Responsive.Panes(_canvas, header, primaryShare: 0.68, wide: _width.IsWide);
+        }
 
         var layout = new Grid
         {

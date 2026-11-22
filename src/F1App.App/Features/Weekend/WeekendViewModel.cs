@@ -1,8 +1,8 @@
 using System.Collections.ObjectModel;
-using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using F1App.Domain;
 using F1App.Telemetry.Weekend;
+using F1App.Theme;
 
 namespace F1App.Features.Weekend;
 
@@ -15,7 +15,7 @@ public sealed partial class SessionRow : ObservableObject
         Type = type;
         Start = start;
         End = end;
-        When = start.ToLocalTime().ToString("ddd dd MMM · HH:mm", CultureInfo.CurrentCulture) +
+        When = Dates.DayTime(start) +
                $"–{end.ToLocalTime():HH:mm}";
     }
 

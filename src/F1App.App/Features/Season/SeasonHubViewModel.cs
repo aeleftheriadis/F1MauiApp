@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using F1App.Domain;
 using F1App.Services;
 using F1App.Telemetry.Circuits;
+using F1App.Theme;
 
 namespace F1App.Features.Season;
 
@@ -194,7 +195,7 @@ public sealed partial class SeasonHubViewModel : ObservableObject
                 Round: string.Create(CultureInfo.InvariantCulture, $"R{race.Round:00}"),
                 Name: race.Name,
                 Circuit: string.Create(CultureInfo.InvariantCulture, $"{race.Circuit.ShortName} · {race.Circuit.Country}"),
-                When: race.RaceStart.ToLocalTime().ToString("ddd dd MMM · HH:mm", CultureInfo.CurrentCulture),
+                When: Dates.DayTime(race.RaceStart),
                 State: isNext ? "NEXT" : isDone ? "DONE" : $"IN {(int)(race.RaceStart - now).TotalDays}d",
                 IsNext: isNext,
                 IsDone: isDone,

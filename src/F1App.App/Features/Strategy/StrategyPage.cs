@@ -25,7 +25,7 @@ public sealed class StrategyPage : ContentPage
             TextColor = Themes.Current.TextPrimary,
             TitleColor = Themes.Current.TextSecondary,
             BackgroundColor = Themes.Current.SurfaceMuted,
-            HeightRequest = Tokens.MinTouchTarget,
+            MinimumHeightRequest = Tokens.MinPickerHeight,
         };
         _picker.SetBinding(Picker.ItemsSourceProperty, nameof(StrategyViewModel.SessionNames));
         _picker.SelectedIndexChanged += async (_, _) =>
@@ -43,6 +43,9 @@ public sealed class StrategyPage : ContentPage
 
     private View BuildContent()
     {
+        // Controls created once in the constructor must leave the old tree before the rebuild.
+        Surfaces.Detach(_picker);
+
         var header = new VerticalStackLayout
         {
             Padding = new Thickness(Tokens.Space4, Tokens.Space3),

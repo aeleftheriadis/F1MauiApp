@@ -10,6 +10,7 @@ public sealed class PaddockPage : ContentPage
     private readonly Image _portrait;
     private readonly Label _noPhoto;
     private bool _loaded;
+    private readonly WidthSwitch _width;
 
     public PaddockPage(PaddockViewModel viewModel)
     {
@@ -17,13 +18,16 @@ public sealed class PaddockPage : ContentPage
 
         _viewModel = viewModel;
         BindingContext = viewModel;
+        _width = new WidthSwitch(Responsive.IsWideAt(Width), () => Content = BuildContent());
         Title = "Paddock";
         BackgroundColor = Themes.Current.Background;
         SafeAreaEdges = SafeAreaEdges.Container;
 
         _portrait = new Image
         {
-            Aspect = Aspect.AspectFill,
+            // Driver headshots are square and small (93x93 from the provider); filling a 190 pt box cropped
+            // them to a chin. Fitting keeps the whole face and does not upscale-crop.
+            Aspect = Aspect.AspectFit,
             HeightRequest = 190,
             BackgroundColor = Themes.Current.SurfaceMuted,
             // MAUI caches the downloaded image on disk: one fetch, then offline.
@@ -49,6 +53,13 @@ public sealed class PaddockPage : ContentPage
         };
     }
 
+    /// <inheritdoc />
+    protected override void OnSizeAllocated(double width, double height)
+    {
+        base.OnSizeAllocated(width, height);
+        _width.Observe(width);
+    }
+
     protected override void OnAppearing()
     {
         base.OnAppearing();
@@ -60,6 +71,14 @@ public sealed class PaddockPage : ContentPage
 
         _loaded = true;
         _viewModel.Refresh();
+
+        // The dossier is the pane a wide window shows first; leaving it on an em dash while the duel lines
+        // already describe a driver was the state a screenshot caught.
+        if (_viewModel.Drivers.Count > 0)
+        {
+            _ = SelectDriverAsync(0);
+        }
+
         _ = LoadDuelsAsync();
     }
 
@@ -98,11 +117,29 @@ public sealed class PaddockPage : ContentPage
         _noPhoto.IsVisible = _viewModel.HasNoPortrait;
     }
 
+    /// <summary>Wraps the portrait, and disappears entirely when there is no picture to show.</summary>
+    private View PhotoFrame()
+    {
+        var frame = new Border
+        {
+            StrokeThickness = 1,
+            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 12 },
+            BackgroundColor = Themes.Current.SurfaceMuted,
+            Margin = new Thickness(0, Tokens.Space1, 0, 0),
+            Content = _portrait,
+        };
+        frame.SetBinding(
+            IsVisibleProperty,
+            new Binding(nameof(PaddockViewModel.PortraitUrl), converter: new NotNullOrEmptyConverter()));
+
+        return frame;
+    }
+
     private View BuildContent()
     {
-        // Both are created in the constructor and re-parented on every palette rebuild.
-        (_portrait.Parent as Layout)?.Remove(_portrait);
-        (_noPhoto.Parent as Layout)?.Remove(_noPhoto);
+        // Controls created once in the constructor must leave the old tree before the rebuild.
+        Surfaces.Detach(_portrait, _noPhoto);
+
 
         var dossier = Surfaces.Card(
             new VerticalStackLayout
@@ -130,20 +167,17 @@ public sealed class PaddockPage : ContentPage
                         Label.TextProperty, nameof(PaddockViewModel.DossierDetail)),
                     Bind(Surfaces.Mono(string.Empty, 10, Themes.Current.LiveText),
                         Label.TextProperty, nameof(PaddockViewModel.DuelLine)),
-                    new Border
-                    {
-                        StrokeThickness = 1,
-                        StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 12 },
-                        BackgroundColor = Themes.Current.SurfaceMuted,
-                        Margin = new Thickness(0, Tokens.Space1, 0, 0),
-                        Content = _portrait,
-                    },
+                    Bind(Surfaces.Mono(string.Empty, 10, Themes.Current.TeleCyan),
+                        Label.TextProperty, nameof(PaddockViewModel.ChampionshipLine)),
+                    PhotoFrame(),
                     _noPhoto,
                     Bind(Surfaces.Mono(string.Empty, 9, Themes.Current.TextSecondary),
                         Label.TextProperty, nameof(PaddockViewModel.PortraitCaption)),
                 },
             },
             new Thickness(Tokens.Space3, Tokens.Space2));
+
+        dossier.VerticalOptions = LayoutOptions.Start;
 
         var roster = new CollectionView
         {
@@ -162,23 +196,24 @@ public sealed class PaddockPage : ContentPage
             }
         };
 
+        // Wide: roster beside the dossier. Phone: dossier on top, roster below - as the prototype did.
+        var panes = Responsive.Panes(roster, dossier, primaryShare: 0.58, secondaryFirstOnPhone: true, wide: _width.IsWide);
+
         var layout = new Grid
         {
             RowDefinitions =
             {
-                new RowDefinition(GridLength.Auto),
                 new RowDefinition(GridLength.Star),
                 new RowDefinition(GridLength.Auto),
             },
             BackgroundColor = Themes.Current.Background,
         };
 
-        layout.Add(dossier, 0, 0);
-        layout.Add(roster, 0, 1);
+        layout.Add(panes, 0, 0);
         layout.Add(
             Surfaces.StatusBar(_viewModel, nameof(PaddockViewModel.Status), nameof(PaddockViewModel.IsBusy)),
             0,
-            2);
+            1);
         return layout;
     }
 

@@ -4,6 +4,7 @@ using F1App.Features.Facts;
 using F1App.Features.More;
 using F1App.Features.News;
 using F1App.Features.PitWall;
+using F1App.Features.Races;
 using F1App.Features.Paddock;
 using F1App.Features.Season;
 using F1App.Features.Compare;
@@ -41,8 +42,13 @@ public static class MauiProgram
         // One gate per provider: the free tiers are per-credential budgets, not per-call.
         // Burst 3: a session load issues three requests back to back (outline, positions, telemetry).
         // Pacing them instead would stall the first screen for seconds for no benefit.
-        var openF1Gate = RequestGate.ForRequestsPerMinute(30, TimeProvider.System, burst: 3);
+        var openF1Gate = RequestGate.ForRequestsPerMinute(
+            ProviderLimits.OpenF1PerMinute, TimeProvider.System, burst: ProviderLimits.OpenF1Burst);
         var jolpicaGate = RequestGate.ForRequestsPerMinute(10, TimeProvider.System);
+
+        // Pacing is the gate's job; this pipeline retries what pacing cannot fix (timeouts, 5xx) and stops
+        // calling a provider that is failing outright. It never retries a 429 - that is a throttle, not a fault.
+        var openF1Resilience = OpenF1Resilience.Create();
 
         // The champions wall costs one request per season, so it needs its own bucket: pacing it at the
         // calendar's 6 s interval turned twenty seasons into two minutes. The 24 h cache, not this gate,
@@ -63,7 +69,17 @@ public static class MauiProgram
             return http;
         });
 
-        builder.Services.AddSingleton(sp => new OpenF1Client(sp.GetRequiredService<HttpClient>(), openF1Gate));
+        var databasePath = Path.Combine(FileSystem.AppDataDirectory, "f1app.db");
+
+        // Every provider response is kept in SQLite, so a restart re-uses what the free tier already paid for.
+        builder.Services.AddSingleton(_ => new SqlitePayloadCache(databasePath));
+
+        builder.Services.AddSingleton(sp => new OpenF1Client(
+            sp.GetRequiredService<HttpClient>(),
+            openF1Gate,
+            openF1Resilience,
+            sp.GetRequiredService<SqlitePayloadCache>(),
+            sp.GetRequiredService<TimeProvider>()));
         builder.Services.AddSingleton(sp => new JolpicaClient(sp.GetRequiredService<HttpClient>(), jolpicaGate));
         builder.Services.AddSingleton(sp => new JolpicaFactsClient(sp.GetRequiredService<HttpClient>(), factsGate));
         // The vault costs one request per season since 1950 and syncs once, so it shares the facts budget.
@@ -72,8 +88,6 @@ public static class MauiProgram
         builder.Services.AddSingleton<ChampionsService>();
         builder.Services.AddSingleton<RaceVaultService>();
         builder.Services.AddSingleton<TeammateDuelService>();
-
-        var databasePath = Path.Combine(FileSystem.AppDataDirectory, "f1app.db");
 
         builder.Services.AddSingleton(sp => new SqliteRaceCalendarStore(
             databasePath,
@@ -131,6 +145,13 @@ public static class MauiProgram
         builder.Services.AddSingleton<SeasonHubPage>();
         builder.Services.AddSingleton<ArchiveViewModel>();
         builder.Services.AddSingleton<ArchivePage>();
+        builder.Services.AddSingleton(sp => new JolpicaRaceDetailClient(
+            sp.GetRequiredService<HttpClient>(),
+            jolpicaGate,
+            sp.GetRequiredService<SqlitePayloadCache>(),
+            sp.GetRequiredService<TimeProvider>()));
+        builder.Services.AddTransient<RaceDetailViewModel>();
+        builder.Services.AddTransient<RaceDetailPage>();
         builder.Services.AddSingleton<MorePage>();
         // Commons asks clients to be conservative: its own bucket, two at a time, not the F1 providers' gates.
         var commonsGate = RequestGate.ForRequestsPerMinute(30, TimeProvider.System, burst: 2);

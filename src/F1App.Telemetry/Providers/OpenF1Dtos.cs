@@ -74,4 +74,9 @@ public sealed record OpenF1Location(
 [JsonSerializable(typeof(List<OpenF1Driver>))]
 [JsonSerializable(typeof(List<OpenF1Meeting>))]
 [JsonSerializable(typeof(List<OpenF1Weather>))]
+[JsonSerializable(typeof(List<OpenF1SessionResult>))]
+[JsonSerializable(typeof(List<OpenF1RaceControl>))]
+[JsonSerializable(typeof(List<OpenF1StartingGrid>))]
+[JsonSerializable(typeof(List<OpenF1Overtake>))]
+[JsonSerializable(typeof(List<OpenF1ChampionshipDriver>))]
 public sealed partial class OpenF1JsonContext : JsonSerializerContext;
