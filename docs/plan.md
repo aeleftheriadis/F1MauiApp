@@ -152,29 +152,26 @@ the app in ~5 s. The cause was a hidden `CollectionView` being repopulated, whic
 
 ## Visual checks queued (cannot be answered by a build log)
 
-These are recorded so they are checked once, on a device, instead of being re-discovered as bugs. Each one is
-something I could only verify as "the file exists and the build accepts it".
+Pruned 2026-11-28. The Android emulator run answered four of the eight originally listed, so they came off
+rather than sitting there implying work that is done:
 
-- **Flyout and tab icons.** 13 icons build and are distinct, but nobody has seen them drawn. Open questions:
-  do they read at 16 px, are they legible on the light-theme chrome (the strokes are a fixed `#94A3B8` grey on
-  `#FFFFFF`, about 2.6:1 - likely too faint), and is each motif right for its screen.
-- **Icon colour does not follow the theme.** The SVG stroke is baked at build time, so light and dark share one
-  shade. If it looks wrong, the fix is a per-theme pair of icons swapped on `Themes.Changed`, not a tint.
-- **Paddock placeholder.** The page used to display the literal text "paddock" until a theme change; that is
-  fixed, but the real dossier has never been looked at.
-- **Status bar and pull-to-refresh.** The spinner is bound to `IsBusy` on nine screens; refresh is wired on four.
-  Whether the spinner appears at the right moments (and does not flash) is a feel question.
-- **`Surfaces.Row` vs `Card`.** List rows were flattened; whether the hairline separators and 44 pt height read
-  as a native list, or as a cramped table, is only answerable by eye.
-- **Archive scroll.** 1,158 rows in one `CollectionView`. MAUI virtualises, but nobody has scrolled it on a
-  phone; if it stutters the answer is incremental loading, not a smaller vault.
-- **Bottom tab bar.** Never drawn — the phone shell is only exercised through `F1APP_PHONE=1` on Windows. A
-  forced-phone screenshot can now be captured the same way, but a real phone's gesture bar, status bar and
-  thumb reach still need hardware.
-- **Light theme overall.** Contrast-checked on paper, unseen in practice.
+- ~~Bottom tab bar never drawn~~ — **answered**: five tabs with icons, light theme.
+- ~~Icons on device~~ — **answered**: drawn and legible at tab size.
+- ~~Light theme overall~~ — **answered**: the app ran in Light; white cards, dark text and red accents read correctly.
+- ~~`Surfaces.Row` vs `Card`~~ — **answered**: the More list reads as a list, not a cramped table.
+- ~~Paddock placeholder~~ — stale since the dossier landed.
 
-**Reference:** `docs/design/pitwall-prototype-4.html` (5 tabs: Season, Pit wall, Paddock, Archive, Media) is the
-visual target; native conventions win where the two disagree.
+Still open, and both are measurements rather than opinions:
+
+- ~~Archive scroll~~ — **measured 2026-11-28** (emulator, hardware GPU): 24.08% janky on 740+ rows against 9.52% on
+  a 23-row screen, p50 34 ms. Real but not damning; incremental loading is not proven necessary, and the 9.5%
+  floor suggests the row template deserves a look first. Numbers and caveats in `docs/agent/findings.md`.
+- **Status bar and pull-to-refresh.** The spinner is bound to `IsBusy` on nine screens and refresh is wired on
+  four; whether it appears at the right moments (and does not flash) is a feel question.
+
+And one known defect, unjudged: **icon colour does not follow the theme** — the SVG stroke is baked at build
+time, so light and dark share one shade. If it looks wrong the fix is a per-theme pair swapped on
+`Themes.Changed`, not a tint.
 
 ## B. Complete archive: every season, every race — CORE DONE 2026-11-21
 

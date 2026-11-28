@@ -7,7 +7,13 @@ Open items from docs/plan.md (source of truth for detail and status):
 - [x] Plan 3 (part): teammate head-to-head in the Paddock dossier — DONE 2026-11-22, 111 tests, live data verified. Open: season radar (must not invent axes), PU/penalty tracker (no open source).
 - [ ] Plan 4: Circuit encyclopedia (Wikimedia aerials; corner metadata blocked)
 - [x] Plan 5 (part): "on this day" — DONE 2026-11-22 on the Archive header, computed from the vault. Open: session notifications (needs platform permission plumbing), what-if championship calculator.
-- [ ] Plan 6: live timing — blocked by ADR-009 until first live fixture
+- [~] Plan 6: live timing — READY to capture, waiting on a session. The observer was exercised on 2026-11-28
+      between sessions: negotiate 200, socket connected, subscribe accepted, and exactly one `{"type":6}`
+      keepalive frame in 20 s — the connection path works and an empty capture outside a session is the correct
+      answer. `tools/live-probe/probe.cs` runs the same call headlessly:
+      `dotnet run tools/live-probe/probe.cs -- <file.jsonl> <seconds>`.
+      NEXT: run it through Qatar Practice 3 (2026-11-28 14:30 UTC) and Qualifying (18:00 UTC), keep the capture,
+      then either promote `TimingDataParser` to a real source or retire it as "shape never observed".
 - [x] OpenF1 `championship_drivers` — DONE 2026-11-22 (Paddock dossier: title position, points, race swing)
 - [x] OpenF1 `overtakes` — DONE 2026-11-22 (Results "N made, M lost")
 - [x] OpenF1 `starting_grid` — DONE 2026-11-22 (Results "places ±N", resolved via the qualifying session)

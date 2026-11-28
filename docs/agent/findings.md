@@ -190,3 +190,34 @@ Evidence, measurements and dead ends. Newest last.
   Result: `[Ailoha.Agent] HTTP server started on port 9233` in logcat, `adb forward tcp:9233 tcp:9233`, and then
   `ailoha android device app` / `ui screenshot` work against the emulator. The Android tab bar draws **all five
   destinations with icons**, unlike WinUI at 390 pt which collapses to two plus an overflow.
+
+- 2026-11-28 **official live-timing hub, probed between sessions.** `OfficialLiveTimingClient.ObserveAsync` ran for
+  20 s at ~09:50 UTC (Qatar weekend, between Practice 2 and Practice 3): negotiate answered, the WebSocket
+  connected, the subscribe was accepted, and exactly **one** frame arrived — `{"type":6}`, SignalR's keepalive.
+  Nothing else, which is what the type's remarks already claimed but had never been measured with a capture file.
+  An 8 s probe caught zero frames (the keepalive is every 15–30 s), so a short probe outside a session proves only
+  that the connection works. `tools/live-probe/probe.cs` reproduces this without the UI.
+
+- 2026-11-28 **Archive scroll measured, and the first measurement was worthless.** On the emulator with
+  `-gpu swiftshader_indirect` (software) a 20-swipe scroll measured **72.5% janky, p50 65 ms** for the 740-row
+  Archive — and **72.88%, p50 81 ms** for the 23-row Season screen. Identical, which means the instrument was the
+  bottleneck and the comparison proved nothing. Re-run with `-gpu host` (Intel UHD 630):
+
+  | screen | frames | janky | p50 | p90 |
+  | --- | --- | --- | --- | --- |
+  | Season, 23 rows | 336 | 9.52% | 31 ms | 46 ms |
+  | Archive, 740+ rows | 299 | 24.08% | 34 ms | 57 ms |
+
+  So the long list does cost about 2.5x the jank of a short one, on this hardware. Two honest limits: it is still
+  an emulator with an integrated GPU, so a flagship phone will be better and a cheap one worse; and the baseline
+  itself (9.5% on 23 rows) is not excellent, so the row template may be worth a look before blaming row count.
+  Incremental loading is therefore **not** proven necessary — the numbers say "measurable", not "unusable".
+- Lesson worth keeping: an A/B where both sides are equally bad is not evidence. Measure a control before
+  concluding a screen is slow.
+
+- 2026-11-28 **Archive row template: fixed height tested, floor not explained.** Each Archive row is seven labels
+  inside six nested containers, and its height was a `MinimumHeightRequest`, so every row was measured. Setting a
+  fixed 64 pt height (same 20-swipe run, hardware GPU) moved janky from 24.08% to **23.23%** and p90 from 57 ms to
+  **48 ms**, p50 34 -> 32 ms. So the change is worth keeping for the tail and does **not** explain the ~9.5%
+  baseline a 23-row screen also shows. The remaining suspect is element count per row; testing that means
+  redesigning the row, which is a layout change rather than a knob, so it is left as a decision.
