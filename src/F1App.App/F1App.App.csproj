@@ -37,6 +37,8 @@
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
     <PackageReference Include="CommunityToolkit.Mvvm" />
     <PackageReference Include="SkiaSharp.Views.Maui.Controls" />
+    <!-- Debug builds only: not merely unregistered in release, but not shipped at all. -->
+    <PackageReference Include="Ailoha.Agent.Maui" Condition="'$(Configuration)' == 'Debug'" />
   </ItemGroup>
 
   <ItemGroup>

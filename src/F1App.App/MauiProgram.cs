@@ -1,3 +1,6 @@
+#if DEBUG
+using Ailoha.Agent;
+#endif
 using F1App.Domain;
 using F1App.Features.Archive;
 using F1App.Features.Facts;
@@ -35,6 +38,7 @@ public static class MauiProgram
     public static MauiApp CreateMauiApp()
     {
         var builder = MauiApp.CreateBuilder();
+
         builder
             .UseMauiApp<App>()
             .UseSkiaSharp()
@@ -47,6 +51,12 @@ public static class MauiProgram
                 fonts.AddFont("BarlowSemiCondensed-SemiBold.ttf", "BarlowSemiBold");
                 fonts.AddFont("BarlowSemiCondensed-Bold.ttf", "BarlowBold");
             });
+
+        // Dev-only, and after UseMauiApp: the agent hooks MAUI's own inspection providers, which do not exist
+        // yet if this runs first. Debug builds only - a release build has no agent and no listening port.
+#if DEBUG
+        builder.AddMauiDevFlowAgent(options => options.EnableProfiler = true);
+#endif
 
         // One gate per provider: the free tiers are per-credential budgets, not per-call.
         // Burst 3: a session load issues three requests back to back (outline, positions, telemetry).

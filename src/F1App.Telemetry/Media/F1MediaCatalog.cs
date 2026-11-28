@@ -123,7 +123,6 @@ public static class F1MediaCatalog
             ["Miami Grand Prix"] = "miami",
             ["Canadian Grand Prix"] = "canada",
             ["Monaco Grand Prix"] = "monaco",
-            ["Barcelona Grand Prix"] = "barcelona-catalunya",
             ["Spanish Grand Prix"] = "spain",
             ["Austrian Grand Prix"] = "austria",
             ["British Grand Prix"] = "great-britain",
@@ -137,6 +136,10 @@ public static class F1MediaCatalog
             ["United States Grand Prix"] = "united-states",
             ["Mexico City Grand Prix"] = "mexico",
             ["Brazilian Grand Prix"] = "brazil",
+            // OpenF1 publishes the same race under a different name than Jolpica; both are real, so both map.
+            ["São Paulo Grand Prix"] = "brazil",
+            ["Sao Paulo Grand Prix"] = "brazil",
+
             ["Las Vegas Grand Prix"] = "las-vegas",
             ["Qatar Grand Prix"] = "qatar",
         }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);

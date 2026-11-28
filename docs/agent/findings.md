@@ -140,3 +140,36 @@ Evidence, measurements and dead ends. Newest last.
   round either). Paths are constructed, not published as a contract: OpenF1's `headshot_url` is a different,
   older scheme (`content/dam/fom-website/drivers/...transform/1col/image.png`, the 93 px crop), so the good
   cutouts exist only in a table of verified ids, with fallbacks.
+- 2026-11-28 **Ailoha set up** (CLI 0.2.4, package `Ailoha.Agent.Maui` 0.2.4 via CPM, registered `#if DEBUG`
+  after `UseMauiApp`). Working end to end: `agent list`, `diagnose`, `device app`, `ui screenshot`,
+  `ui tap <AutomationId>`, `logs`. Proven rather than assumed — `ui tap PitWallSection2` switched the pit wall to
+  NEWS and the screenshot showed it.
+  **Broken in the CLI, not the app:** `ui tree` and `ui query` both return `[]`, while the agent's own HTTP API
+  answers with the full tree (`curl "http://127.0.0.1:11233/api/v1/ui/tree?depth=16"` → Window → AppShell →
+  FlyoutItems → PitWallPage → Grids/Labels/Buttons). Passing `--agent-port` explicitly changes nothing, so the
+  CLI is the failing layer. Workaround: read the tree over HTTP, address elements by AutomationId.
+  **Side effect worth knowing:** this agent serialises a control's `AutomationId` into the tree's `text` field,
+  so adding ids to the pit-wall section buttons made `ui query --text "TIMING"` stop matching them. Ids are the
+  better handle; text queries simply will not match an element that has one.
+- 2026-11-28 **Ailoha, debug-only verified both ways.** Debug: the three Ailoha assemblies are in the output,
+  `agent wait` returns the agent on port 11233, `device app` names the app, `ui tap PitWallSection0` and a
+  screenshot confirm it drives the app. Release: no Ailoha assembly in the output, the running process opens no
+  port, and its stdout never mentions Ailoha. The package reference is conditioned on `Configuration == Debug`
+  as well as the registration, so a release build cannot ship the agent even by accident.
+  Note for whoever tests this next: `agent list` keeps stale entries after an app exits (it reported 2 agents
+  with none running), so it is not evidence either way — the output folder and the process's own listening
+  socket are.
+- 2026-11-28 **the meeting name was missing from the app, not just from `SessionRequest`.** `WeekendSchedule`
+  already had a `MeetingName` field, but the weekend loader filled it with `"LOSAIL 2026"` — a circuit and a year,
+  not a race. OpenF1's *sessions* payload carries `meeting_key` but no name; the *meetings* payload carries
+  `meeting_name` ("Qatar Grand Prix") and was already cached, so the loader now joins it by key. Consequence:
+  the pit wall can show its circuit card, and the catalogue can be keyed on real race names. Names still differ
+  per publisher — Jolpica says "Brazilian Grand Prix", OpenF1 says "São Paulo Grand Prix" — so the media catalogue
+  accepts both and a test pins that they resolve to the same verified card.
+- 2026-11-28 **"phone shell in a desktop window" was not a phone pass.** `F1APP_PHONE=1` switched the shell but
+  left the window at ~1400 pt, so the screenshots showed the phone *arrangement* at desktop width and answered
+  nothing; the harness even skipped its resize loop in phone mode. With the window at 390x844: Paddock's portrait
+  ate a third of the screen, and the Results classification clipped four columns (S1/S2/S3 above all, plus GAP,
+  TYRE, PIT and OFFICIAL off-screen) with no way to reach them. Both fixed and re-shot. The WinUI tab bar shows
+  two of five tabs plus an overflow at that width — noted, not patched, because Android draws its own bar and is
+  the shipping target.

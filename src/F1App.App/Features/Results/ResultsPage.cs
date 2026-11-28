@@ -10,6 +10,8 @@ public sealed class ResultsPage : ContentPage
     private readonly Button _replayButton;
     private bool _loaded;
 
+    private readonly WidthSwitch _width;
+
     public ResultsPage(ResultsViewModel viewModel)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
@@ -17,6 +19,7 @@ public sealed class ResultsPage : ContentPage
         _viewModel = viewModel;
         BindingContext = viewModel;
         Title = "Results";
+        _width = new WidthSwitch(Responsive.IsWideAt(Width), () => Content = BuildContent());
         BackgroundColor = Themes.Current.Background;
         SafeAreaEdges = SafeAreaEdges.Container;
 
@@ -135,7 +138,7 @@ public sealed class ResultsPage : ContentPage
             ItemTemplate = new DataTemplate(BuildRow),
             SelectionMode = SelectionMode.None,
             BackgroundColor = Themes.Current.Background,
-            Header = BuildColumnHeader(),
+            Header = BuildColumnHeader(_width.IsWide),
         };
 
         var layout = new Grid
@@ -153,14 +156,34 @@ public sealed class ResultsPage : ContentPage
         return layout;
     }
 
-    private static View BuildColumnHeader()
+    /// <summary>
+    /// Column widths, wide or narrow.
+    /// </summary>
+    /// <remarks>
+    /// A 390 pt phone cannot hold ten columns: the last four fell off the right edge and were unreachable, which
+    /// is worse than not showing them. Narrow keeps position, driver, best lap, gap and official result - the
+    /// columns a classification is read for - and drops the three sector times, the tyre and the pit count.
+    /// Zero means "not present", and both the header and the rows skip it, so the two cannot disagree.
+    /// </remarks>
+    private static double[] ColumnWidths(bool wide) =>
+        wide
+            ? [32, 54, 82, 58, 58, 58, 72, 68, 30, 84]
+            : [28, 50, 96, 0, 0, 0, 62, 0, 0, 74];
+
+    private static View BuildColumnHeader(bool wide)
     {
-        var grid = Grid(32, 54, 82, 58, 58, 58, 72, 68, 30, 84);
+        var widths = ColumnWidths(wide);
+        var grid = Grid(widths);
 
         string[] captions = ["P", "DRV", "BEST LAP", "S1", "S2", "S3", "GAP", "TYRE", "PIT", "OFFICIAL"];
 
         for (var i = 0; i < captions.Length; i++)
         {
+            if (widths[i] <= 0)
+            {
+                continue;
+            }
+
             grid.Add(new Label
             {
                 Text = captions[i],
@@ -174,9 +197,21 @@ public sealed class ResultsPage : ContentPage
         return grid;
     }
 
-    private static View BuildRow()
+    private View BuildRow()
     {
-        var grid = Grid(32, 54, 82, 58, 58, 58, 72, 68, 30, 84);
+        var wide = _width.IsWide;
+        var widths = ColumnWidths(wide);
+
+        var grid = Grid(widths);
+        var columns = new List<int>();
+        for (var i = 0; i < widths.Length; i++)
+        {
+            if (widths[i] > 0)
+            {
+                columns.Add(i);
+            }
+        }
+
         grid.Padding = new Thickness(Tokens.Space2, Tokens.Space1);
         grid.SetBinding(SemanticProperties.DescriptionProperty, nameof(TimingDisplayRow.AccessibleText));
 
@@ -189,17 +224,25 @@ public sealed class ResultsPage : ContentPage
         };
         teamRule.SetBinding(BoxView.ColorProperty, nameof(TimingDisplayRow.TeamColor));
 
-        grid.Add(teamRule, 0);
-        grid.Add(Cell(nameof(TimingDisplayRow.Position), Themes.Current.TextSecondary, TextAlignment.End), 0);
-        grid.Add(Cell(nameof(TimingDisplayRow.Code), Themes.Current.TextPrimary, TextAlignment.Start, bold: true), 1);
-        grid.Add(Cell(nameof(TimingDisplayRow.BestLap), Themes.Current.TextPrimary, TextAlignment.Start), 2);
-        grid.Add(Cell(nameof(TimingDisplayRow.Sector1), nameof(TimingDisplayRow.Sector1Color), TextAlignment.Start), 3);
-        grid.Add(Cell(nameof(TimingDisplayRow.Sector2), nameof(TimingDisplayRow.Sector2Color), TextAlignment.Start), 4);
-        grid.Add(Cell(nameof(TimingDisplayRow.Sector3), nameof(TimingDisplayRow.Sector3Color), TextAlignment.Start), 5);
-        grid.Add(Cell(nameof(TimingDisplayRow.Gap), Themes.Current.TextSecondary, TextAlignment.Start), 6);
-        grid.Add(Cell(nameof(TimingDisplayRow.Tyre), Themes.Current.TextSecondary, TextAlignment.Start), 7);
-        grid.Add(Cell(nameof(TimingDisplayRow.Pits), Themes.Current.TextSecondary, TextAlignment.End), 8);
-        grid.Add(Cell(nameof(TimingDisplayRow.Official), Themes.Current.TextSecondary, TextAlignment.End), 9);
+        void Place(View view, int column)
+        {
+            if (columns.Contains(column))
+            {
+                grid.Add(view, column);
+            }
+        }
+
+        Place(teamRule, 0);
+        Place(Cell(nameof(TimingDisplayRow.Position), Themes.Current.TextSecondary, TextAlignment.End), 0);
+        Place(Cell(nameof(TimingDisplayRow.Code), Themes.Current.TextPrimary, TextAlignment.Start, bold: true), 1);
+        Place(Cell(nameof(TimingDisplayRow.BestLap), Themes.Current.TextPrimary, TextAlignment.Start), 2);
+        Place(Cell(nameof(TimingDisplayRow.Sector1), nameof(TimingDisplayRow.Sector1Color), TextAlignment.Start), 3);
+        Place(Cell(nameof(TimingDisplayRow.Sector2), nameof(TimingDisplayRow.Sector2Color), TextAlignment.Start), 4);
+        Place(Cell(nameof(TimingDisplayRow.Sector3), nameof(TimingDisplayRow.Sector3Color), TextAlignment.Start), 5);
+        Place(Cell(nameof(TimingDisplayRow.Gap), Themes.Current.TextSecondary, TextAlignment.Start), 6);
+        Place(Cell(nameof(TimingDisplayRow.Tyre), Themes.Current.TextSecondary, TextAlignment.Start), 7);
+        Place(Cell(nameof(TimingDisplayRow.Pits), Themes.Current.TextSecondary, TextAlignment.End), 8);
+        Place(Cell(nameof(TimingDisplayRow.Official), Themes.Current.TextSecondary, TextAlignment.End), 9);
 
         return grid;
     }

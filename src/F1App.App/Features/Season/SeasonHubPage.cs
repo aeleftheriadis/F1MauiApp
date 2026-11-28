@@ -28,6 +28,7 @@ public sealed class SeasonHubPage : ContentPage
 
         _year = new Picker
         {
+            AutomationId = "SeasonYearPicker",
             TextColor = Themes.Current.TextPrimary,
             TitleColor = Themes.Current.TextSecondary,
             BackgroundColor = Themes.Current.SurfaceMuted,

@@ -194,7 +194,7 @@ public sealed partial class ResultsViewModel : ObservableObject
         Status = $"switching replay to {slot.Name}";
         await _runner
             .SwitchToAsync(
-                new SessionRequest(slot.SessionKey, slot.Name, slot.Start.AddMinutes(10), _schedule.Circuit.Id),
+                new SessionRequest(slot.SessionKey, slot.Name, slot.Start.AddMinutes(10), _schedule.Circuit.Id, _schedule.MeetingName),
                 cancellationToken)
             .ConfigureAwait(true);
 

@@ -187,6 +187,10 @@ public sealed class PaddockPage : ContentPage
         Surfaces.Detach(_portrait, _noPhoto, _carCard);
 
 
+        // On a phone the dossier is the first thing on screen, and a 190 pt figure plus padding pushed the car
+        // and the roster below the fold. The picture keeps its aspect, it just takes less height.
+        _portrait.HeightRequest = _width.IsWide ? 190 : 150;
+
         var dossier = Surfaces.Card(
             new VerticalStackLayout
             {

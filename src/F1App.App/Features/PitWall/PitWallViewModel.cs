@@ -142,6 +142,9 @@ public sealed partial class PitWallViewModel : ObservableObject
     /// <summary>Every car, in published classification order.</summary>
     public ObservableCollection<PitWallRow> Rows { get; } = [];
 
+    /// <summary>The race's published name, for the header's circuit card. Empty when the replay carries none.</summary>
+    public string MeetingName => _runner.MeetingName;
+
     [ObservableProperty]
     public partial string Headline { get; set; }
 

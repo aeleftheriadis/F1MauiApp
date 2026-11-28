@@ -22,12 +22,18 @@ Open items from docs/plan.md (source of truth for detail and status):
 - [x] Crash clicking the pit-wall NEWS tab — fixed 2026-11-22 (hidden Media CollectionView was being repopulated)
 - [x] F1.com look and feel, phase 1 — palette, Barlow Semi Condensed (OFL), media catalogue, image resolver,
       credited cutouts/cars on Paddock, circuit card on the Season hero (2026-11-22)
-- [ ] F1.com look and feel, phase 2 — per-row imagery was deliberately left out of the 1 100-row Archive, and
-      the HUD screens have no hero art because `SessionRequest` carries no meeting name. Both are recorded as
-      rulings in the SDD ledger; adding a meeting name to the request unlocks the HUD hero.
-- [ ] Static event leaks: `Themes.Changed` and the singleton `NewsViewModel.PropertyChanged` are subscribed in
-      every page constructor and never unsubscribed — closed pages still rebuild content. Not the cause of the
-      NEWS crash, but the same class of "touch a closed view" failure.
+- [x] F1.com look and feel, phase 2 (HUD hero) — DONE 2026-11-28. `WeekendSchedule.MeetingName` now carries the
+      race's published name (the loader joins the cached meetings payload; it held "LOSAIL 2026" before),
+      `SessionRequest.MeetingName` carries it to the replay, and the pit wall shows its circuit card above the
+      header, collapsing to nothing when the name is unknown. Verified by screenshot: the Qatar card renders.
+      Still open: per-row imagery in the 1 100-row Archive stays deliberately out (SDD ruling).
+- [x] Ailoha agent set up (2026-11-28): package + `#if DEBUG` registration, AutomationIds on the pit-wall tabs
+      and the season picker, verified by a real tap + screenshot
+- [ ] Ailoha CLI 0.2.4 `ui tree` / `ui query` return `[]` against this app while the agent's HTTP API works — retry
+      after a CLI update; until then use `curl .../api/v1/ui/tree?depth=16`
+- [x] Static event leaks — fixed 2026-11-22 (correction: this line stayed open after the fix). All 15 pages now
+      call `Themes.RebuildOnChange`, which subscribes on `Loaded` and releases on `Unloaded`, and the pit-wall news
+      handler is bound to the same lifetime. Verified by a Light/Dark theme flip with screenshots.
 - [ ] Visual checks queued in docs/plan.md ("Visual checks queued") — icons on device, light-theme contrast,
       status spinner feel, Row vs Card, Archive scroll with 1,158 rows, bottom tab bar, light theme
 - [x] Responsive layout for desktop + phone — DONE 2026-11-22 (ADR-017; Paddock, Track, Season, Archive, width-driven via WidthSwitch)

@@ -72,6 +72,19 @@ public sealed class F1MediaCatalogTests
     }
 
     [Fact]
+    public void CircuitCardForMeeting_AcceptsBothPublishersNamesForTheSameRace()
+    {
+        // Jolpica says "Brazilian Grand Prix", OpenF1 says "São Paulo Grand Prix". Both are real names of the
+        // same round, so both must resolve - and both must land on the same, verified card.
+        var jolpica = F1MediaCatalog.CircuitCardForMeeting("Brazilian Grand Prix");
+        var openF1 = F1MediaCatalog.CircuitCardForMeeting("São Paulo Grand Prix");
+
+        Assert.NotNull(jolpica);
+        Assert.Equal(jolpica, openF1);
+        Assert.EndsWith("/card/brazil.webp", jolpica!.ToString());
+    }
+
+    [Fact]
     public void CircuitCard_UnknownSlug_ReturnsNull()
     {
         Assert.Null(F1MediaCatalog.CircuitCard("never-heard-of-it"));

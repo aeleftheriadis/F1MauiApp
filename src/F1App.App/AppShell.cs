@@ -210,6 +210,23 @@ public sealed partial class AppShell : Shell
 
         if (IsPhone)
         {
+            // A phone shell in a desktop window is not a phone layout: without this the walk rendered the
+            // phone arrangement at 1400 pt and the screenshots answered nothing. 390x844 is a current phone.
+            if (Window is { } phoneWindow)
+            {
+                try
+                {
+                    phoneWindow.Width = 390;
+                    phoneWindow.Height = 844;
+                    await Task.Delay(TimeSpan.FromSeconds(2));
+                    Diagnostics.Write("INFO", null, "phone: window resized to 390x844");
+                }
+                catch (Exception exception)
+                {
+                    Diagnostics.Write("PAGE", exception, "phone resize");
+                }
+            }
+
             // Five tabs, then the nine secondary screens as pushes - the same pages, reached the other way.
             foreach (var route in new[] { "season", "pitwall", "archive", "paddock", "more" })
             {
