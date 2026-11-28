@@ -221,3 +221,12 @@ Evidence, measurements and dead ends. Newest last.
   **48 ms**, p50 34 -> 32 ms. So the change is worth keeping for the tail and does **not** explain the ~9.5%
   baseline a 23-row screen also shows. The remaining suspect is element count per row; testing that means
   redesigning the row, which is a layout change rather than a knob, so it is left as a decision.
+
+- 2026-11-28 **the capture tool now answers the parser question, and proved it can say yes.** `probe.cs` reads
+  the capture and reports what `TimingDataParser` makes of it, with three distinct verdicts: real TimingData
+  arrived, the hub was silent, or the file is not one JSON object per line. All three were exercised:
+  a keepalive-only capture from the hub -> "sent no TimingData"; the unit-test fixture written pretty-printed ->
+  "not one JSON object per line" (11 lines, none valid); the same fixture compacted to one line -> "real
+  TimingData arrived, 3 standings across 3 drivers", matching what the unit test asserts.
+  The middle case is the one worth keeping: without it, a pretty-printed capture would have read exactly like a
+  silent hub at 14:30, and the wrong conclusion would have been recorded as fact.

@@ -14,6 +14,8 @@ Open items from docs/plan.md (source of truth for detail and status):
       `dotnet run tools/live-probe/probe.cs -- <file.jsonl> <seconds>`.
       NEXT: run it through Qatar Practice 3 (2026-11-28 14:30 UTC) and Qualifying (18:00 UTC), keep the capture,
       then either promote `TimingDataParser` to a real source or retire it as "shape never observed".
+      The probe already prints the verdict (data arrived / hub silent / file not one-JSON-per-line), and all three
+      paths were exercised today, so the decision needs no further tooling.
 - [x] OpenF1 `championship_drivers` — DONE 2026-11-22 (Paddock dossier: title position, points, race swing)
 - [x] OpenF1 `overtakes` — DONE 2026-11-22 (Results "N made, M lost")
 - [x] OpenF1 `starting_grid` — DONE 2026-11-22 (Results "places ±N", resolved via the qualifying session)
