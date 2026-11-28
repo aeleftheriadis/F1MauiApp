@@ -10,7 +10,7 @@
   <ItemGroup Label="MAUI">
     <PackageVersion Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
     <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
-    <PackageVersion Include="SkiaSharp.Views.Maui.Controls" Version="3.119.0" />
+    <PackageVersion Include="SkiaSharp.Views.Maui.Controls" Version="4.158.0" />
   </ItemGroup>
 
   <!-- Dev-only agent for UI inspection from the Ailoha CLI; registered inside #if DEBUG only. -->
