@@ -230,3 +230,64 @@ Evidence, measurements and dead ends. Newest last.
   TimingData arrived, 3 standings across 3 drivers", matching what the unit test asserts.
   The middle case is the one worth keeping: without it, a pretty-printed capture would have read exactly like a
   silent hub at 14:30, and the wrong conclusion would have been recorded as fact.
+
+- 2026-11-28 **Commons search cannot identify a circuit, only rank files that mention its name.**
+  Plan 4's aerial photograph was already built (Track screen, cached per circuit) but never measured; measuring it
+  changed the answer. All numbers below are real requests, one per circuit of the 2026 calendar from
+  `api.openf1.org/v1/meetings`.
+  - **The shipped query took the first result, and the first result is often a drawing.** "Montréal circuit
+    aerial" returns `F1 1978 circuit ile notre dame.png` first and
+    `Circuit Gilles-Villeneuve, May 29, 2018 SkySat.jpg` second. Jeddah and Miami Gardens return nothing at all.
+  - **Filtering to aerial-titled files** (`SkySat`, `satellite`, `Sentinel`, `Landsat`, `aerial`, …) gives
+    **19 of 26** circuits a photograph, of which **2 are the wrong place**: `Caesars Palace Grand Prix circuit
+    aerial photo 1981.jpg` (a circuit abandoned in 1984) for Las Vegas, and a file titled only `Aerial view` for
+    São Paulo.
+  - **Requiring the venue's name in the title** — the rule now in `WikimediaImageClient.FindAerialAsync` — gives
+    **12 of 26**, with **1 still wrong**: `Speed Vegas Motorsports Park aerial photo 20220611.jpg` for Las Vegas,
+    a different venue in the same city. Name matching establishes a city, not a circuit.
+  - **The guard's cost is measurable and arbitrary**: correct aerials are lost where Commons titles the file with
+    the circuit's official name rather than the city — Montréal (`Circuit Gilles-Villeneuve`), Monte Carlo
+    (`Circuit de Monaco`), Spielberg (`Red Bull Ring`), Austin (`Circuit of the Americas`), Mexico City
+    (`Autódromo Hermanos Rodríguez`).
+  - **Commons rate limit, measured:** `429` after nine requests at 1.2 s spacing. The app's own gate
+    (30/min, burst 2 ⇒ at least 2 s apart) is why it is not throttled; 2.6 s spacing answered 26 requests clean.
+  - **Decision 2026-11-28 (user): keep the guarded version.** The caption prints the file title, author and
+    licence, so a wrong venue is visible rather than hidden. The cache key moved to `circuit-aerial:` so a layout
+    diagram stored by an earlier build is not served again.
+  - **Not solved, and not cheap to solve:** circuit identity from an open source. A curated slug→Commons-category
+    map would fix it and would be data to maintain; the OpenF1 payload's own `circuit_image` already gives every
+    circuit artwork, so the photograph is decoration, not information.
+
+- 2026-11-28 **the tab icons failed contrast on the light theme, and one mid-grey fixes both themes.**
+  The thirteen `Resources/Images/*.svg` files carried a baked `stroke="#94A3B8"`. Measured contrast:
+  **7.07:1 on `#15151E`** (dark canvas) and **2.37:1 on `#F4F6F9`** (light canvas) — the light figure is under the
+  3:1 WCAG 1.4.11 asks of a graphical object, which is why the icons read as faint on white.
+  Because the two failing and passing ranges overlap in a narrow band (roughly relative luminance 0.12–0.27),
+  one colour clears both: `#6B7280` gives **3.75:1 and 4.47:1**. Chosen over a per-theme pair, which would mean
+  thirteen more assets plus a swap on `Themes.Changed`. `#7C8595` also passes both (4.88 and 3.44) but has the
+  lower worst case, so it was rejected. Verified by arithmetic against the palette file, not by eye.
+
+- 2026-11-28 **no image from Commons has ever rendered in this app, and the screenshot proved it four minutes after
+  I said the icon fix was verified.**
+  The Track screen showed the correct caption with an empty grey frame: the file had resolved, the picture had not.
+  Cause, measured: Wikimedia now serves thumbnails from `thumb.wikimedia.org`, which answers **403 to a request with
+  no User-Agent** and 200 with any agent (app UA and a browser UA both returned 464 821 bytes). The control was
+  given a bare URL through `Image.Source`, so *it* made the request - agentless - and the frame stayed blank. The
+  same held for the Commons fallback portraits on Paddock, which nobody had noticed because Commons is only the
+  third choice there.
+  **Fix:** render from the bytes the resolver already downloads with the app's own `HttpClient`
+  (`ImageSource.FromStream` over `ImageMemoryCache`), never from a URL. `F1Images` now does this for every image,
+  the Track screen takes `F1Images.RemoteAsync` instead of binding `PhotoUrl`, and `F1ImageResolver.TryGetBytes`
+  hands the bytes over. ADR-019 still holds: a `UriImageSource` would have written them to disk, a stream does not.
+  **Verified by screenshot, not by reasoning:** the Track screen now draws the Albert Park aerial, and Paddock's
+  cutout and car still draw.
+  **Side measurement:** `iiurlwidth=640` now returns a `960px-` thumbnail with `utm_*` parameters - Commons ignores
+  the requested width - so one circuit photo is ~465 KB. Acceptable at 12 cached pictures; it would not be at 1 147.
+
+- 2026-11-28 **Jolpica was down for the whole afternoon, and that decided what could be measured.**
+  `api.jolpi.ca` answered **502 with a Cloudflare error body to every path** — `f1/2024.json`, `circuits/monza.json`,
+  `results/1.json`, `pitstops`, `drivers`, `constructors` — with the app's User-Agent, with a browser UA, and with no
+  User-Agent at all (so it is the origin, not agent blocking). OpenF1 stayed up throughout. Consequence: the Plan C
+  records pass (poles, podiums, fastest laps) could not be verified and was not written; Plan E's per-field verdicts
+  therefore rest on the app's existing verified usage plus Ergast's documented shape, and are marked unverified
+  where they do. Re-probe before starting either.

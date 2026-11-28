@@ -46,6 +46,10 @@ public sealed class F1Images
     public Task<ImageSource?> CircuitForMeetingAsync(string? meetingName, CancellationToken cancellationToken) =>
         FirstAsync(new Uri?[] { F1MediaCatalog.CircuitCardForMeeting(meetingName) }, cancellationToken);
 
+    /// <summary>A picture from any URL, resolved the same way: bytes in memory, never a URL the control fetches.</summary>
+    public Task<ImageSource?> RemoteAsync(Uri? url, CancellationToken cancellationToken) =>
+        FirstAsync(new[] { url }, cancellationToken);
+
     private async Task<ImageSource?> FirstAsync(IReadOnlyList<Uri?> candidates, CancellationToken cancellationToken)
     {
         var url = await _resolver.ResolveAsync(candidates, cancellationToken).ConfigureAwait(true);
@@ -55,9 +59,15 @@ public sealed class F1Images
             return null;
         }
 
-        // CachingEnabled must stay false: MAUI's UriImageSource otherwise writes the downloaded bitmap into the
-        // app's cache folder, and F1's artwork may only ever live in memory (ADR-019). This is the one place the
-        // rule can be broken silently, because the control caches by default.
-        return new UriImageSource { Uri = url, CachingEnabled = false };
+        // The control must never fetch the URL itself: it sends no User-Agent, and Wikimedia's thumbnail host
+        // answers 403 to an agentless request (measured 2026-11-28), which draws an empty frame. The bytes the
+        // resolver already downloaded are handed over instead, and they stay in memory only - a UriImageSource
+        // would write them to the app's cache folder, which ADR-019 forbids for F1's artwork.
+        if (!_resolver.TryGetBytes(url, out var bytes))
+        {
+            return null;
+        }
+
+        return ImageSource.FromStream(() => new MemoryStream(bytes, writable: false));
     }
 }

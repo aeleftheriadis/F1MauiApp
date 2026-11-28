@@ -40,13 +40,20 @@ The roster and portrait dossiers exist. Missing: teammate head-to-head, season r
 * **PU components and penalty points:** **no open source**. Either leave it out or model it as a "not available"
   panel like team radio.
 
-## 4. Circuit encyclopedia
+## 4. Circuit encyclopedia — PARTLY DONE 2026-11-28
 
 * Corner names and DRS zones are not in any open feed. Available open data: geometry (already used), measured lap
   length, race date, winner history (already used).
-* Wikimedia has aerial photographs of most circuits, CC-licensed — same mechanism as driver portraits (ADR-010).
+* **Aerial photograph: DONE, with a measured limit.** The Track screen shows a Commons aerial above the map, and
+  only when the file's own title names the venue. That is 12 of the 2026 calendar's 26 circuits: Commons returns
+  hand-drawn layouts for several venues (they rank *first* for Montréal), and for Las Vegas it returns a
+  photograph of Speed Vegas Motorsports Park, a different circuit in the same city. Numbers in
+  `docs/agent/findings.md`; the rule is pinned by `WikimediaImageClientTests`.
+* The OpenF1 payload's own `circuit_image` already gives every circuit a track icon, so the photograph is
+  decoration rather than information — which is why half the calendar having none is acceptable.
 * **Stop if:** corner-level metadata is expected. It would have to be hand-curated, which is a licensing and
-  maintenance question before it is a coding one.
+  maintenance question before it is a coding one. A curated slug→Commons-category map would also fix the wrong
+  venue, and is the same kind of maintenance.
 
 ## 5. Weekend tools
 
@@ -169,9 +176,12 @@ Still open, and both are measurements rather than opinions:
 - **Status bar and pull-to-refresh.** The spinner is bound to `IsBusy` on nine screens and refresh is wired on
   four; whether it appears at the right moments (and does not flash) is a feel question.
 
-And one known defect, unjudged: **icon colour does not follow the theme** — the SVG stroke is baked at build
-time, so light and dark share one shade. If it looks wrong the fix is a per-theme pair swapped on
-`Themes.Changed`, not a tint.
+~~One known defect, unjudged: icon colour does not follow the theme~~ — **judged and fixed 2026-11-28.** The
+baked stroke was `#94A3B8`: **7.07:1 on the dark canvas, 2.37:1 on the light one**, i.e. below the 3:1 that WCAG
+1.4.11 asks of a graphical object. A per-theme pair would need thirteen more assets and a swap on
+`Themes.Changed`; a single mid-grey covers both, because 3:1 against `#15151E` and against `#F4F6F9` overlap in one
+narrow band. `#6B7280` sits in it at **3.75:1 and 4.47:1**. Every icon is now that shade in both themes — a
+deliberate flattening, recorded here so nobody "restores" the old tint.
 
 ## B. Complete archive: every season, every race — CORE DONE 2026-11-21
 
@@ -281,3 +291,76 @@ standings the app already shows, and the delta between the two fields is the in-
 5. ~~`overtakes` for a Facts record~~ - **done 2026-11-22** on Results; then `championship_*`, which **is** usable: the start snapshot matches Jolpica
    exactly, so a delta (points_current - points_start) is a real in-race swing and not a competing truth.
 6. `team_radio` - last, and only if the licensing question is answered; it is F1-hosted audio, not open data.
+
+## E. Dossiers: drivers, teams, cars, pit stops, regulations — PLANNED 2026-11-28, NOT STARTED
+
+**Request (2026-11-28).** More stats and detail about drivers and teams; fastest pit stops; details of each car;
+how the cars changed through a season; the FIA regulations. Images only where the licence allows. Research and
+UI/UX are part of the work, not a preface to it. **It starts on its own branch, after research** — nothing here is
+begun, and this section exists so the research happens before the code.
+
+### What is open data, what needs research, and what is probably impossible
+
+Measured 2026-11-28 against the two providers the app already uses. Nothing below is planned on an unverified
+source: a field whose source is not confirmed does not get a screen slot.
+
+| Ask | Source | Verdict |
+| --- | --- | --- |
+| Driver career numbers: starts, wins, points, titles, per-season line | Jolpica `results` + `driverStandings` (both in use) | **Computable** from a paced pass over the seasons the vault already syncs. |
+| Poles, podiums, fastest laps | Jolpica `qualifying` + `results` per season | **Computable, not yet verified**: ~77 seasons × 1–2 requests ≈ 150, paced at 8/min ≈ 20 min, resumable, cached like the vault. Jolpica returned **502 to every path** on 2026-11-28, so the exact payload was not confirmed — that is the first thing to do when it is back. |
+| Team history: constructors' titles, wins, eras | Jolpica standings + the vault's winner/constructor columns | **Computable**, with one trap: the API has no name lineage (Toro Rosso → AlphaTauri → RB, Jordan → Force India → Racing Point → Aston Martin). Without a curated alias table the counts are silently split across names and therefore wrong. The table is data to maintain, not code. |
+| Fastest pit stops | Jolpica `pitstops` (has `duration`; already consumed by the race-detail screen) and, 2023+, OpenF1 `pit` (`pit_duration`) | **Available now.** Per race, the fastest stop is a min over rows already fetched. A season leaderboard is one request per race; note that pre-2011 stop durations are largely absent, so any all-time figure must say "since 2011" or show nothing. |
+| Car details: chassis, engine, gearbox, designer, weight | **neither API has any of it** | **Research required, may not exist in licit form — and if it does not, the car screen is not built.** Candidates to test: Wikidata items per car (CC0, machine-readable) and Wikipedia infoboxes (CC BY-SA, but scraping an infobox is a brittle non-API). F1.com car pages are all rights reserved — link out only. Expect gaps: the plan is a car section that shows the fields a source backs and says so when the list is short. |
+| Mid-season changes and upgrades | **no open source** | **Almost certainly impossible, and therefore no screen.** Press releases are copyrighted and secondary summaries are unreliable; a timeline assembled from memory would be invented data. If the research pass finds no citable feed, this ask ends there — no screen, and the research document says why. |
+| FIA regulations | fia.com document library: PDFs, no key, no account | **Free to read, not free to copy.** Titles, dates and links are fine; a short quoted excerpt with attribution at most. Reproducing rule text, or screenshots of it, is out. |
+
+### Images, and what each licence actually permits
+
+Four classes, and only three of them can be shown:
+
+1. **Formula 1 media**, from OpenF1 payloads (`headshot_url`, `circuit_image`, `country_flag`): hotlinked, credited
+   on screen, never copied, cropped or stored (ADR-010, in use since 2026-11-22).
+2. **Wikimedia Commons** (CC BY / CC BY-SA): author and licence on screen, memory only (ADR-019). Verified
+   2026-11-28: thumbnails now come from `thumb.wikimedia.org`, which answers 403 to an agentless request, so the
+   image must be fetched by the app and rendered from memory, never bound as a bare URL.
+3. **Wikidata images**: the same Commons files, so the same rule — resolve to the Commons file and show its author.
+4. **FIA and team press material**: **no reuse.** Not a logo, not a regulation page screenshot. Link out.
+
+### UI/UX (designed later, on that branch)
+
+The shape follows what exists rather than a new vocabulary: `Surfaces.Row` for factual lines, `HeroCard` for the
+subject, `DriverRow` for lists, the credited-image block for artwork, ADR-017's two arrangements for desktop and
+phone, and the palette tokens for colour. The screens this asks for:
+
+- **Driver page** — the Paddock dossier grown up: career table, per-season line, team history, and the records it
+  holds, all computed from the vault.
+- **Team page** — from the constructor card: titles, wins, seasons, driver line, and a car section that lists only
+  the specifications a verified source states.
+- **Pit-stop leaderboard** — fastest stop per race (already computed on Results), plus a season and archive board,
+  always labelled with the era limitation.
+- **Regulations reading list** — titles, dates, links out; no reproduction. It exists only if the fia.com document
+  library serves those links without a key, which the research pass checks.
+
+**A screen is only built when research found data for it (decision 2026-11-28).** No data, no screen — not a screen
+that explains its own emptiness. So the car section appears only if the research pass verifies car specifications
+against a citable source; the mid-season-changes screen does not appear at all unless a citable feed exists, and
+that is the expected outcome. Inside a screen that *does* exist, a missing field is simply not drawn; it is never
+filled with a plausible-looking guess.
+
+### Order, when this starts on its own branch
+
+1. **Research pass first**, as a background agent per the `research` skill, writing
+   `docs/research/2026-11-28-dossiers.md`: one row per field with source URL, licence, a real sample request, and a
+   verified/unverified flag. No field gets built from an unverified row.
+2. **Vault pass** for poles, podiums, fastest laps and the constructor alias table — blocked until Jolpica answers.
+3. **Pit-stop boards** from data the app already fetches: no new source, no new licence.
+4. **Car and team pages last**, because they are the ones most likely to have no licit source at all.
+
+Skills to use on that branch: `research` (the pass above), `brainstorming` → `writing-plans` (spec before code),
+`plan-ui-change` (decomposing the new screens), `ui-ux-pro-max` (visual decisions), `code-testing` (parsers and
+queries), and `dotnet-breaking-changes` if the domain records for drivers and teams have to be split.
+
+**Stop if:** the dataset behind a screen has no citable open source — then that screen is dropped, not stubbed.
+No curated-from-memory facts, no scraped infoboxes, no regulation text, and no placeholder screens for data that
+does not exist. The research document is what records the drop, so the decision is visible later rather than
+looking like something nobody got round to.

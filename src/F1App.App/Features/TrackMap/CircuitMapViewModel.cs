@@ -23,7 +23,8 @@ public sealed partial class CircuitMapViewModel : ObservableObject
     private readonly JolpicaCircuitWinners _winners;
     private readonly JolpicaClient _calendar;
     private readonly SessionRunner _runner;
-    private readonly WikimediaImageClient _images;
+    private readonly WikimediaImageClient _commons;
+    private readonly F1Images _images;
     private readonly SqliteMediaCache _media;
     private readonly TimeProvider _timeProvider;
     private ImmutableArray<CircuitEntry> _entries = [];
@@ -34,7 +35,8 @@ public sealed partial class CircuitMapViewModel : ObservableObject
         JolpicaCircuitWinners winners,
         JolpicaClient calendar,
         SessionRunner runner,
-        WikimediaImageClient images,
+        WikimediaImageClient commons,
+        F1Images images,
         SqliteMediaCache media,
         TimeProvider timeProvider)
     {
@@ -43,6 +45,7 @@ public sealed partial class CircuitMapViewModel : ObservableObject
         ArgumentNullException.ThrowIfNull(winners);
         ArgumentNullException.ThrowIfNull(calendar);
         ArgumentNullException.ThrowIfNull(runner);
+        ArgumentNullException.ThrowIfNull(images);
         ArgumentNullException.ThrowIfNull(timeProvider);
 
         _catalogue = catalogue;
@@ -50,6 +53,7 @@ public sealed partial class CircuitMapViewModel : ObservableObject
         _winners = winners;
         _calendar = calendar;
         _runner = runner;
+        _commons = commons;
         _images = images;
         _media = media;
         _timeProvider = timeProvider;
@@ -57,7 +61,7 @@ public sealed partial class CircuitMapViewModel : ObservableObject
         Headline = "circuits";
         Facts = string.Empty;
         Winners = string.Empty;
-        PhotoUrl = null;
+        PhotoSource = null;
         PhotoCaption = string.Empty;
         TrackIconUrl = null;
         CountryFlagUrl = null;
@@ -83,7 +87,7 @@ public sealed partial class CircuitMapViewModel : ObservableObject
 
     /// <summary>Freely licensed aerial photo of the circuit, or <see langword="null"/> when there is none.</summary>
     [ObservableProperty]
-    public partial string? PhotoUrl { get; set; }
+    public partial ImageSource? PhotoSource { get; set; }
 
     /// <summary>File title, author and licence - a condition of the licence, not a nicety.</summary>
     [ObservableProperty]
@@ -257,33 +261,34 @@ public sealed partial class CircuitMapViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Fetches a circuit photo from Commons, cached per circuit so a second visit costs nothing.
+    /// Fetches a circuit photograph from Commons, cached per circuit so a second visit costs nothing.
     /// </summary>
     /// <remarks>
-    /// The photo is an extra, never a requirement: every failure path leaves <see cref="PhotoUrl"/> null and
-    /// the screen simply has no picture. Commons is searched by circuit name, which is what its files are
-    /// titled with; "aerial" is added because a photo of the grandstand is not an encyclopedia entry.
+    /// The photo is an extra, never a requirement: every failure path leaves <see cref="PhotoSource"/> null and
+    /// the screen simply has no picture. Only aerial imagery is accepted, because Commons returns hand-drawn
+    /// layouts for the venues it has no photograph of and they rank first; the cache key carries that filter so
+    /// a diagram stored by an earlier build is not served again.
     /// </remarks>
     private async Task LoadPhotoAsync(CircuitEntry entry, CancellationToken cancellationToken)
     {
-        PhotoUrl = null;
+        PhotoSource = null;
         PhotoCaption = string.Empty;
         TrackIconUrl = null;
         CountryFlagUrl = null;
         ImageCredit = string.Empty;
 
-        var subject = $"circuit:{entry.Circuit.Name}";
+        var subject = $"circuit-aerial:{entry.Circuit.Name}";
 
         var cached = await _media.ReadAsync(subject, cancellationToken).ConfigureAwait(true);
 
         if (cached is not null)
         {
-            ApplyPhoto(cached);
+            await ApplyPhotoAsync(cached, cancellationToken).ConfigureAwait(true);
             return;
         }
 
-        var found = await _images
-            .FindAsync($"{entry.Circuit.Name} circuit aerial", cancellationToken)
+        var found = await _commons
+            .FindAerialAsync(entry.Circuit.Name, cancellationToken)
             .ConfigureAwait(true);
 
         switch (found)
@@ -291,7 +296,7 @@ public sealed partial class CircuitMapViewModel : ObservableObject
             case OpenImage image:
                 await _media.WriteAsync(subject, image, _timeProvider.GetUtcNow(), cancellationToken)
                     .ConfigureAwait(true);
-                ApplyPhoto(image);
+                await ApplyPhotoAsync(image, cancellationToken).ConfigureAwait(true);
                 break;
 
             case HttpFailure:
@@ -305,19 +310,19 @@ public sealed partial class CircuitMapViewModel : ObservableObject
         }
     }
 
-    private void ApplyPhoto(OpenImage image)
+    private async Task ApplyPhotoAsync(OpenImage image, CancellationToken cancellationToken)
     {
         if (image == SqliteMediaCache.Empty || string.IsNullOrEmpty(image.PreviewUrl))
         {
-            PhotoUrl = null;
+            PhotoSource = null;
             PhotoCaption = string.Empty;
             return;
         }
 
-        PhotoUrl = image.PreviewUrl;
+        PhotoSource = await _images.RemoteAsync(new Uri(image.PreviewUrl), cancellationToken).ConfigureAwait(true);
         PhotoCaption = string.Create(
             CultureInfo.InvariantCulture,
-            $"{image.Title} · {image.Artist} · {image.Licence} · Wikimedia Commons");
+            $"Commons: {image.Title} · {image.Artist} · {image.Licence}");
     }
 
     private async Task LoadWinnersAsync(CircuitEntry entry, CancellationToken cancellationToken)
