@@ -173,3 +173,20 @@ Evidence, measurements and dead ends. Newest last.
   TYRE, PIT and OFFICIAL off-screen) with no way to reach them. Both fixed and re-shot. The WinUI tab bar shows
   two of five tabs plus an overflow at that width — noted, not patched, because Android draws its own bar and is
   the shipping target.
+- 2026-11-28 **Ailoha on Android, checked for real** (emulator `pixel_7_-_api_36_0`, API 36 x86_64). Four things
+  had to be fixed to get there, and the last two are defects in this project rather than the environment:
+  1. `ANDROID_HOME` points at `%LOCALAPPDATA%\Android\Sdk`, which holds **only platform-tools**. The real SDK
+     lives at `C:\Program Files (x86)\Android\android-sdk` (build-tools 36/37, platforms 36/37, emulator,
+     android-36 system image). Every tool inherits the wrong root, so pass `-p:AndroidSdkDirectory=...` and set
+     `ANDROID_SDK_ROOT` for the emulator. This is why the earlier Android build failed with `XA5205 aapt2`.
+  2. **My own bug:** the `F1APP_CLICK` real-pointer harness used `Microsoft.UI.Xaml` and `WinRT.Interop`
+     unguarded, so the Android TFM did not compile at all (5 errors, all in `AppShell.cs`). Now `#if WINDOWS`.
+  3. **Debug APKs use fast deployment**: `adb install` of a Debug APK ships a runtime with no
+     `System.Private.CoreLib.dll`, and the app aborts at `host.cc:452` during runtime init with
+     `CLR error: Failed to load System.Private.CoreLib.dll`. Build with `-p:EmbedAssembliesIntoApk=true` when
+     installing by hand.
+  4. **Android chrome was .NET purple** (`#512BD4` from the template's `colors.xml`), which Windows never showed
+     because the Shell paints its own bar there. Now the app palette; verified by screenshot.
+  Result: `[Ailoha.Agent] HTTP server started on port 9233` in logcat, `adb forward tcp:9233 tcp:9233`, and then
+  `ailoha android device app` / `ui screenshot` work against the emulator. The Android tab bar draws **all five
+  destinations with icons**, unlike WinUI at 390 pt which collapses to two plus an overflow.

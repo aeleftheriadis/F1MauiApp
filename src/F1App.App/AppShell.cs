@@ -1,4 +1,6 @@
+#if WINDOWS
 using System.Runtime.InteropServices;
+#endif
 using F1App.Features.Archive;
 using F1App.Features.Compare;
 using F1App.Features.Facts;
@@ -281,6 +283,7 @@ public sealed partial class AppShell : Shell
     /// </remarks>
     private static async Task PressPitWallTabsAsync(PitWallPage pit)
     {
+#if WINDOWS
         if (Environment.GetEnvironmentVariable("F1APP_CLICK") == "1")
         {
             foreach (var section in new[] { 2, 0, 3, 2 })
@@ -297,6 +300,7 @@ public sealed partial class AppShell : Shell
             Diagnostics.Write("INFO", null, "pitwall tabs clicked");
             return;
         }
+#endif
 
         for (var section = 0; section < 4; section++)
         {
@@ -322,6 +326,7 @@ public sealed partial class AppShell : Shell
     /// Calling the handler directly is not the same thing: a pointer click reaches XAML's input and focus
     /// machinery first. The reported crash only exists on that path.
     /// </remarks>
+#if WINDOWS
     private static void ClickAt(Button button)
     {
         if (button?.Handler?.PlatformView is not Microsoft.UI.Xaml.FrameworkElement native)
@@ -383,6 +388,7 @@ public sealed partial class AppShell : Shell
         [DllImport("user32.dll")]
         internal static extern void mouse_event(uint flags, int dx, int dy, uint data, UIntPtr extra);
     }
+#endif
 
     private static string ShotsFolder() => Path.Combine(FileSystem.CacheDirectory, "shots");
 

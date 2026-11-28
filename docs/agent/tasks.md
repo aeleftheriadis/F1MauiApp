@@ -29,6 +29,10 @@ Open items from docs/plan.md (source of truth for detail and status):
       Still open: per-row imagery in the 1 100-row Archive stays deliberately out (SDD ruling).
 - [x] Ailoha agent set up (2026-11-28): package + `#if DEBUG` registration, AutomationIds on the pit-wall tabs
       and the season picker, verified by a real tap + screenshot
+- [x] Ailoha on Android — VERIFIED 2026-11-28 on the emulator: agent on 9233 inside the device, driven from the
+      host through `adb forward`, screenshot confirmed. Fixed on the way: a WinUI-only harness block that broke the
+      Android compile, `EmbedAssembliesIntoApk` for hand installs, and the template's purple Android chrome.
+      Open: the environment itself — `ANDROID_HOME` points at an empty SDK folder
 - [ ] Ailoha CLI 0.2.4 `ui tree` / `ui query` return `[]` against this app while the agent's HTTP API works — retry
       after a CLI update; until then use `curl .../api/v1/ui/tree?depth=16`
 - [x] Static event leaks — fixed 2026-11-22 (correction: this line stayed open after the fix). All 15 pages now
