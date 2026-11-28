@@ -176,9 +176,12 @@ Still open, and both are measurements rather than opinions:
 - **Status bar and pull-to-refresh.** The spinner is bound to `IsBusy` on nine screens and refresh is wired on
   four; whether it appears at the right moments (and does not flash) is a feel question.
 
-And one known defect, unjudged: **icon colour does not follow the theme** — the SVG stroke is baked at build
-time, so light and dark share one shade. If it looks wrong the fix is a per-theme pair swapped on
-`Themes.Changed`, not a tint.
+~~One known defect, unjudged: icon colour does not follow the theme~~ — **judged and fixed 2026-11-28.** The
+baked stroke was `#94A3B8`: **7.07:1 on the dark canvas, 2.37:1 on the light one**, i.e. below the 3:1 that WCAG
+1.4.11 asks of a graphical object. A per-theme pair would need thirteen more assets and a swap on
+`Themes.Changed`; a single mid-grey covers both, because 3:1 against `#15151E` and against `#F4F6F9` overlap in one
+narrow band. `#6B7280` sits in it at **3.75:1 and 4.47:1**. Every icon is now that shade in both themes — a
+deliberate flattening, recorded here so nobody "restores" the old tint.
 
 ## B. Complete archive: every season, every race — CORE DONE 2026-11-21
 

@@ -257,3 +257,12 @@ Evidence, measurements and dead ends. Newest last.
   - **Not solved, and not cheap to solve:** circuit identity from an open source. A curated slug→Commons-category
     map would fix it and would be data to maintain; the OpenF1 payload's own `circuit_image` already gives every
     circuit artwork, so the photograph is decoration, not information.
+
+- 2026-11-28 **the tab icons failed contrast on the light theme, and one mid-grey fixes both themes.**
+  The thirteen `Resources/Images/*.svg` files carried a baked `stroke="#94A3B8"`. Measured contrast:
+  **7.07:1 on `#15151E`** (dark canvas) and **2.37:1 on `#F4F6F9`** (light canvas) — the light figure is under the
+  3:1 WCAG 1.4.11 asks of a graphical object, which is why the icons read as faint on white.
+  Because the two failing and passing ranges overlap in a narrow band (roughly relative luminance 0.12–0.27),
+  one colour clears both: `#6B7280` gives **3.75:1 and 4.47:1**. Chosen over a per-theme pair, which would mean
+  thirteen more assets plus a swap on `Themes.Changed`. `#7C8595` also passes both (4.88 and 3.44) but has the
+  lower worst case, so it was rejected. Verified by arithmetic against the palette file, not by eye.
