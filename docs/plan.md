@@ -310,8 +310,8 @@ source: a field whose source is not confirmed does not get a screen slot.
 | Poles, podiums, fastest laps | Jolpica `qualifying` + `results` per season | **Computable, not yet verified**: ~77 seasons × 1–2 requests ≈ 150, paced at 8/min ≈ 20 min, resumable, cached like the vault. Jolpica returned **502 to every path** on 2026-11-28, so the exact payload was not confirmed — that is the first thing to do when it is back. |
 | Team history: constructors' titles, wins, eras | Jolpica standings + the vault's winner/constructor columns | **Computable**, with one trap: the API has no name lineage (Toro Rosso → AlphaTauri → RB, Jordan → Force India → Racing Point → Aston Martin). Without a curated alias table the counts are silently split across names and therefore wrong. The table is data to maintain, not code. |
 | Fastest pit stops | Jolpica `pitstops` (has `duration`; already consumed by the race-detail screen) and, 2023+, OpenF1 `pit` (`pit_duration`) | **Available now.** Per race, the fastest stop is a min over rows already fetched. A season leaderboard is one request per race; note that pre-2011 stop durations are largely absent, so any all-time figure must say "since 2011" or show nothing. |
-| Car details: chassis, engine, gearbox, designer, weight | **neither API has any of it** | **Research required, may not exist in licit form.** Candidates to test: Wikidata items per car (CC0, machine-readable) and Wikipedia infoboxes (CC BY-SA, but scraping an infobox is a brittle non-API). F1.com car pages are all rights reserved — link out only. Expect gaps: the plan is a car section that shows the fields a source backs and says so when the list is short. |
-| Mid-season changes and upgrades | **no open source** | **Almost certainly impossible.** Press releases are copyrighted and secondary summaries are unreliable; a timeline assembled from memory would be invented data, which this project does not ship. If research finds no citable feed, this ask is answered "not available" in the UI rather than faked. |
+| Car details: chassis, engine, gearbox, designer, weight | **neither API has any of it** | **Research required, may not exist in licit form — and if it does not, the car screen is not built.** Candidates to test: Wikidata items per car (CC0, machine-readable) and Wikipedia infoboxes (CC BY-SA, but scraping an infobox is a brittle non-API). F1.com car pages are all rights reserved — link out only. Expect gaps: the plan is a car section that shows the fields a source backs and says so when the list is short. |
+| Mid-season changes and upgrades | **no open source** | **Almost certainly impossible, and therefore no screen.** Press releases are copyrighted and secondary summaries are unreliable; a timeline assembled from memory would be invented data. If the research pass finds no citable feed, this ask ends there — no screen, and the research document says why. |
 | FIA regulations | fia.com document library: PDFs, no key, no account | **Free to read, not free to copy.** Titles, dates and links are fine; a short quoted excerpt with attribution at most. Reproducing rule text, or screenshots of it, is out. |
 
 ### Images, and what each licence actually permits
@@ -338,10 +338,14 @@ phone, and the palette tokens for colour. The screens this asks for:
   the specifications a verified source states.
 - **Pit-stop leaderboard** — fastest stop per race (already computed on Results), plus a season and archive board,
   always labelled with the era limitation.
-- **Regulations reading list** — titles, dates, links out; no reproduction, and the screen says why.
+- **Regulations reading list** — titles, dates, links out; no reproduction. It exists only if the fia.com document
+  library serves those links without a key, which the research pass checks.
 
-Every empty state says *which* thing is missing and why ("no open source publishes gearbox ratios"), because that is
-the honest version of "not implemented" and it is the difference between a gap and a lie.
+**A screen is only built when research found data for it (decision 2026-11-28).** No data, no screen — not a screen
+that explains its own emptiness. So the car section appears only if the research pass verifies car specifications
+against a citable source; the mid-season-changes screen does not appear at all unless a citable feed exists, and
+that is the expected outcome. Inside a screen that *does* exist, a missing field is simply not drawn; it is never
+filled with a plausible-looking guess.
 
 ### Order, when this starts on its own branch
 
@@ -356,5 +360,7 @@ Skills to use on that branch: `research` (the pass above), `brainstorming` → `
 `plan-ui-change` (decomposing the new screens), `ui-ux-pro-max` (visual decisions), `code-testing` (parsers and
 queries), and `dotnet-breaking-changes` if the domain records for drivers and teams have to be split.
 
-**Stop if:** a field has no citable open source. Then the screen says so. No curated-from-memory facts, no scraped
-infoboxes, no regulation text.
+**Stop if:** the dataset behind a screen has no citable open source — then that screen is dropped, not stubbed.
+No curated-from-memory facts, no scraped infoboxes, no regulation text, and no placeholder screens for data that
+does not exist. The research document is what records the drop, so the decision is visible later rather than
+looking like something nobody got round to.

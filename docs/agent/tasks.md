@@ -61,4 +61,6 @@ Open items from docs/plan.md (source of truth for detail and status):
       ONLY 2026-11-28, not started, own branch later. Detail and the per-field source verdict table in docs/plan.md
       §E. Order when it starts: research pass (background agent, `research` skill) → docs/research/*.md → vault pass
       for poles/podiums/fastest laps (blocked: Jolpica answered 502 to every path on 2026-11-28) → pit-stop boards
-      from data already fetched → car/team pages last, since they may have no licit open source.
+      from data already fetched → car/team pages last, since they may have no licit open source. RULE (2026-11-28):
+      a screen whose dataset research cannot verify is NOT built — no placeholder screens, no "not available" page.
+      The research document records each drop.
