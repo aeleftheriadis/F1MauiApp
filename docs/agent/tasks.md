@@ -57,3 +57,8 @@ Open items from docs/plan.md (source of truth for detail and status):
 - [x] Plan B (core): complete archive 1950→ — DONE 2026-11-21, winner-level vault synced + searchable. Still open: full per-race detail screens (classification/qualifying/pit stops).
 - [x] Plan C (core): record book — DONE 2026-11-21 on the Archive screen (all-time wins, drivers + constructors). Still open: poles/podiums/fastest-lap records, circuit/season records, milestones, on-this-day.
 - [ ] Plan D: replay fallback removal — code done 2026-11-21; open question: remove empty replay screens?
+- [ ] Plan E: driver/team/car dossiers, fastest pit stops, car changes through a season, FIA regulations — PLANNED
+      ONLY 2026-11-28, not started, own branch later. Detail and the per-field source verdict table in docs/plan.md
+      §E. Order when it starts: research pass (background agent, `research` skill) → docs/research/*.md → vault pass
+      for poles/podiums/fastest laps (blocked: Jolpica answered 502 to every path on 2026-11-28) → pit-stop boards
+      from data already fetched → car/team pages last, since they may have no licit open source.

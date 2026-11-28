@@ -283,3 +283,11 @@ Evidence, measurements and dead ends. Newest last.
   cutout and car still draw.
   **Side measurement:** `iiurlwidth=640` now returns a `960px-` thumbnail with `utm_*` parameters - Commons ignores
   the requested width - so one circuit photo is ~465 KB. Acceptable at 12 cached pictures; it would not be at 1 147.
+
+- 2026-11-28 **Jolpica was down for the whole afternoon, and that decided what could be measured.**
+  `api.jolpi.ca` answered **502 with a Cloudflare error body to every path** — `f1/2024.json`, `circuits/monza.json`,
+  `results/1.json`, `pitstops`, `drivers`, `constructors` — with the app's User-Agent, with a browser UA, and with no
+  User-Agent at all (so it is the origin, not agent blocking). OpenF1 stayed up throughout. Consequence: the Plan C
+  records pass (poles, podiums, fastest laps) could not be verified and was not written; Plan E's per-field verdicts
+  therefore rest on the app's existing verified usage plus Ergast's documented shape, and are marked unverified
+  where they do. Re-probe before starting either.
