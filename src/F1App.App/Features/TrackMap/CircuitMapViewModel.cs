@@ -257,12 +257,13 @@ public sealed partial class CircuitMapViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Fetches a circuit photo from Commons, cached per circuit so a second visit costs nothing.
+    /// Fetches a circuit photograph from Commons, cached per circuit so a second visit costs nothing.
     /// </summary>
     /// <remarks>
     /// The photo is an extra, never a requirement: every failure path leaves <see cref="PhotoUrl"/> null and
-    /// the screen simply has no picture. Commons is searched by circuit name, which is what its files are
-    /// titled with; "aerial" is added because a photo of the grandstand is not an encyclopedia entry.
+    /// the screen simply has no picture. Only aerial imagery is accepted, because Commons returns hand-drawn
+    /// layouts for the venues it has no photograph of and they rank first; the cache key carries that filter so
+    /// a diagram stored by an earlier build is not served again.
     /// </remarks>
     private async Task LoadPhotoAsync(CircuitEntry entry, CancellationToken cancellationToken)
     {
@@ -272,7 +273,7 @@ public sealed partial class CircuitMapViewModel : ObservableObject
         CountryFlagUrl = null;
         ImageCredit = string.Empty;
 
-        var subject = $"circuit:{entry.Circuit.Name}";
+        var subject = $"circuit-aerial:{entry.Circuit.Name}";
 
         var cached = await _media.ReadAsync(subject, cancellationToken).ConfigureAwait(true);
 
@@ -283,7 +284,7 @@ public sealed partial class CircuitMapViewModel : ObservableObject
         }
 
         var found = await _images
-            .FindAsync($"{entry.Circuit.Name} circuit aerial", cancellationToken)
+            .FindAerialAsync(entry.Circuit.Name, cancellationToken)
             .ConfigureAwait(true);
 
         switch (found)
@@ -317,7 +318,7 @@ public sealed partial class CircuitMapViewModel : ObservableObject
         PhotoUrl = image.PreviewUrl;
         PhotoCaption = string.Create(
             CultureInfo.InvariantCulture,
-            $"{image.Title} · {image.Artist} · {image.Licence} · Wikimedia Commons");
+            $"Commons: {image.Title} · {image.Artist} · {image.Licence}");
     }
 
     private async Task LoadWinnersAsync(CircuitEntry entry, CancellationToken cancellationToken)

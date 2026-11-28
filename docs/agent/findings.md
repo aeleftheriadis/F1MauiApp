@@ -230,3 +230,30 @@ Evidence, measurements and dead ends. Newest last.
   TimingData arrived, 3 standings across 3 drivers", matching what the unit test asserts.
   The middle case is the one worth keeping: without it, a pretty-printed capture would have read exactly like a
   silent hub at 14:30, and the wrong conclusion would have been recorded as fact.
+
+- 2026-11-28 **Commons search cannot identify a circuit, only rank files that mention its name.**
+  Plan 4's aerial photograph was already built (Track screen, cached per circuit) but never measured; measuring it
+  changed the answer. All numbers below are real requests, one per circuit of the 2026 calendar from
+  `api.openf1.org/v1/meetings`.
+  - **The shipped query took the first result, and the first result is often a drawing.** "Montréal circuit
+    aerial" returns `F1 1978 circuit ile notre dame.png` first and
+    `Circuit Gilles-Villeneuve, May 29, 2018 SkySat.jpg` second. Jeddah and Miami Gardens return nothing at all.
+  - **Filtering to aerial-titled files** (`SkySat`, `satellite`, `Sentinel`, `Landsat`, `aerial`, …) gives
+    **19 of 26** circuits a photograph, of which **2 are the wrong place**: `Caesars Palace Grand Prix circuit
+    aerial photo 1981.jpg` (a circuit abandoned in 1984) for Las Vegas, and a file titled only `Aerial view` for
+    São Paulo.
+  - **Requiring the venue's name in the title** — the rule now in `WikimediaImageClient.FindAerialAsync` — gives
+    **12 of 26**, with **1 still wrong**: `Speed Vegas Motorsports Park aerial photo 20220611.jpg` for Las Vegas,
+    a different venue in the same city. Name matching establishes a city, not a circuit.
+  - **The guard's cost is measurable and arbitrary**: correct aerials are lost where Commons titles the file with
+    the circuit's official name rather than the city — Montréal (`Circuit Gilles-Villeneuve`), Monte Carlo
+    (`Circuit de Monaco`), Spielberg (`Red Bull Ring`), Austin (`Circuit of the Americas`), Mexico City
+    (`Autódromo Hermanos Rodríguez`).
+  - **Commons rate limit, measured:** `429` after nine requests at 1.2 s spacing. The app's own gate
+    (30/min, burst 2 ⇒ at least 2 s apart) is why it is not throttled; 2.6 s spacing answered 26 requests clean.
+  - **Decision 2026-11-28 (user): keep the guarded version.** The caption prints the file title, author and
+    licence, so a wrong venue is visible rather than hidden. The cache key moved to `circuit-aerial:` so a layout
+    diagram stored by an earlier build is not served again.
+  - **Not solved, and not cheap to solve:** circuit identity from an open source. A curated slug→Commons-category
+    map would fix it and would be data to maintain; the OpenF1 payload's own `circuit_image` already gives every
+    circuit artwork, so the photograph is decoration, not information.

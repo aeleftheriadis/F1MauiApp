@@ -40,13 +40,20 @@ The roster and portrait dossiers exist. Missing: teammate head-to-head, season r
 * **PU components and penalty points:** **no open source**. Either leave it out or model it as a "not available"
   panel like team radio.
 
-## 4. Circuit encyclopedia
+## 4. Circuit encyclopedia — PARTLY DONE 2026-11-28
 
 * Corner names and DRS zones are not in any open feed. Available open data: geometry (already used), measured lap
   length, race date, winner history (already used).
-* Wikimedia has aerial photographs of most circuits, CC-licensed — same mechanism as driver portraits (ADR-010).
+* **Aerial photograph: DONE, with a measured limit.** The Track screen shows a Commons aerial above the map, and
+  only when the file's own title names the venue. That is 12 of the 2026 calendar's 26 circuits: Commons returns
+  hand-drawn layouts for several venues (they rank *first* for Montréal), and for Las Vegas it returns a
+  photograph of Speed Vegas Motorsports Park, a different circuit in the same city. Numbers in
+  `docs/agent/findings.md`; the rule is pinned by `WikimediaImageClientTests`.
+* The OpenF1 payload's own `circuit_image` already gives every circuit a track icon, so the photograph is
+  decoration rather than information — which is why half the calendar having none is acceptable.
 * **Stop if:** corner-level metadata is expected. It would have to be hand-curated, which is a licensing and
-  maintenance question before it is a coding one.
+  maintenance question before it is a coding one. A curated slug→Commons-category map would also fix the wrong
+  venue, and is the same kind of maintenance.
 
 ## 5. Weekend tools
 

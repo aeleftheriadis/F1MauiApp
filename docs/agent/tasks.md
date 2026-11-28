@@ -5,7 +5,10 @@ Open items from docs/plan.md (source of truth for detail and status):
 - [x] Plan 1: historical session picker — DONE 2026-11-21, tap a Season round card; build 0w/0e, walk clean
 - [x] Plan 2 (core): Archive tab — DONE 2026-11-21. All races since 1950 + all-time win records (ADR-013, race_vault table, live sync verified: 1,147 races / 76 seasons). Still open: worm chart, stint matrix, normalised points.
 - [x] Plan 3 (part): teammate head-to-head in the Paddock dossier — DONE 2026-11-22, 111 tests, live data verified. Open: season radar (must not invent axes), PU/penalty tracker (no open source).
-- [ ] Plan 4: Circuit encyclopedia (Wikimedia aerials; corner metadata blocked)
+- [x] Plan 4 (aerials): DONE 2026-11-28. The Track screen's Commons photograph now shows only aerial imagery whose
+      file title names the venue — measured 12/26 circuits, 1 known wrong (Las Vegas → Speed Vegas Motorsports
+      Park), user chose to keep it with the file title in the caption. Commons 429s at 1.2 s spacing; measured
+      numbers in docs/agent/findings.md. Still open: corner metadata (blocked, needs hand curation).
 - [x] Plan 5 (part): "on this day" — DONE 2026-11-22 on the Archive header, computed from the vault. Open: session notifications (needs platform permission plumbing), what-if championship calculator.
 - [~] Plan 6: live timing — READY to capture, waiting on a session. The observer was exercised on 2026-11-28
       between sessions: negotiate 200, socket connected, subscribe accepted, and exactly one `{"type":6}`
