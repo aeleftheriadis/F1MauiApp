@@ -80,6 +80,22 @@ public sealed class F1ImageResolverTests
         Assert.Null(await resolver.ResolveAsync([cutout], cancelled.Token));
     }
 
+    [Fact]
+    public async Task ResolveAsync_AfterSuccess_KeepsTheBytesSoAControlNeedNotFetchTheUrl()
+    {
+        // Wikimedia's thumbnail host answers 403 to a request with no User-Agent - and a control handed a bare
+        // URL sends none - so the screen renders from these bytes instead of letting the control fetch.
+        var cutout = F1MediaCatalog.DriverCutout("ANT")!;
+        var resolver = new F1ImageResolver(
+            new HttpClient(new MappedHandler().Map(cutout, HttpStatusCode.OK)),
+            new ImageMemoryCache(4));
+
+        await resolver.ResolveAsync([cutout], CancellationToken.None);
+
+        Assert.True(resolver.TryGetBytes(cutout, out var bytes));
+        Assert.Equal(2, bytes.Length);
+    }
+
     private sealed class MappedHandler : HttpMessageHandler
     {
         private readonly Dictionary<string, HttpStatusCode> _map = [];

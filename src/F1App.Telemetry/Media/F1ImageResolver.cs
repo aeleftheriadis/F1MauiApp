@@ -12,9 +12,10 @@ namespace F1App.Telemetry.Media;
 /// an error a person is shown.
 /// </para>
 /// <para>
-/// The probe fetches with <see cref="HttpCompletionOption.ResponseHeadersRead"/> and disposes the response: the
-/// point is to learn whether the URL is good, and the bytes are cached by the image control itself when it
-/// renders from the URL.
+/// The probe downloads the bytes with this app's own <see cref="HttpClient"/> and keeps them, because the caller
+/// renders from them: a control handed a bare URL fetches it itself, without the app's User-Agent, and Wikimedia's
+/// thumbnail host answers 403 to an agentless request (measured 2026-11-28) - a blank frame that looks like a
+/// broken image.
 /// </para>
 /// </remarks>
 public sealed class F1ImageResolver
@@ -30,6 +31,18 @@ public sealed class F1ImageResolver
 
         _http = http;
         _cache = cache;
+    }
+
+    /// <summary>The bytes already downloaded for <paramref name="url"/>, so a control need not fetch them again.</summary>
+    /// <remarks>
+    /// The screen renders from these: a control that is handed a URL downloads it itself, without the app's
+    /// User-Agent, and Wikimedia's thumbnail host answers <c>403</c> to a request with no agent at all (measured
+    /// 2026-11-28). Handing over the bytes it already paid for is both correct and one round trip cheaper.
+    /// </remarks>
+    public bool TryGetBytes(Uri url, out byte[] bytes)
+    {
+        ArgumentNullException.ThrowIfNull(url);
+        return _cache.TryGet(url.ToString(), out bytes);
     }
 
     /// <summary>Returns the first candidate that answers with an image, or <see langword="null"/>.</summary>

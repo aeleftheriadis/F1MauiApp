@@ -266,3 +266,20 @@ Evidence, measurements and dead ends. Newest last.
   one colour clears both: `#6B7280` gives **3.75:1 and 4.47:1**. Chosen over a per-theme pair, which would mean
   thirteen more assets plus a swap on `Themes.Changed`. `#7C8595` also passes both (4.88 and 3.44) but has the
   lower worst case, so it was rejected. Verified by arithmetic against the palette file, not by eye.
+
+- 2026-11-28 **no image from Commons has ever rendered in this app, and the screenshot proved it four minutes after
+  I said the icon fix was verified.**
+  The Track screen showed the correct caption with an empty grey frame: the file had resolved, the picture had not.
+  Cause, measured: Wikimedia now serves thumbnails from `thumb.wikimedia.org`, which answers **403 to a request with
+  no User-Agent** and 200 with any agent (app UA and a browser UA both returned 464 821 bytes). The control was
+  given a bare URL through `Image.Source`, so *it* made the request - agentless - and the frame stayed blank. The
+  same held for the Commons fallback portraits on Paddock, which nobody had noticed because Commons is only the
+  third choice there.
+  **Fix:** render from the bytes the resolver already downloads with the app's own `HttpClient`
+  (`ImageSource.FromStream` over `ImageMemoryCache`), never from a URL. `F1Images` now does this for every image,
+  the Track screen takes `F1Images.RemoteAsync` instead of binding `PhotoUrl`, and `F1ImageResolver.TryGetBytes`
+  hands the bytes over. ADR-019 still holds: a `UriImageSource` would have written them to disk, a stream does not.
+  **Verified by screenshot, not by reasoning:** the Track screen now draws the Albert Park aerial, and Paddock's
+  cutout and car still draw.
+  **Side measurement:** `iiurlwidth=640` now returns a `960px-` thumbnail with `utm_*` parameters - Commons ignores
+  the requested width - so one circuit photo is ~465 KB. Acceptable at 12 cached pictures; it would not be at 1 147.

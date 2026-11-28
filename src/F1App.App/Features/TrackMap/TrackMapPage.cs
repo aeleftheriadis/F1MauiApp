@@ -257,7 +257,7 @@ public sealed class TrackMapPage : ContentPage, IDisposable
             HeightRequest = 132,
             BackgroundColor = Themes.Current.SurfaceMuted,
         };
-        image.SetBinding(Image.SourceProperty, nameof(CircuitMapViewModel.PhotoUrl));
+        image.SetBinding(Image.SourceProperty, nameof(CircuitMapViewModel.PhotoSource));
 
         var caption = Surfaces.Mono(string.Empty, 9, Themes.Current.TextSecondary);
         caption.SetBinding(Label.TextProperty, nameof(CircuitMapViewModel.PhotoCaption));
@@ -267,7 +267,7 @@ public sealed class TrackMapPage : ContentPage, IDisposable
         var block = new VerticalStackLayout { Spacing = 2, Children = { image, caption } };
         block.SetBinding(
             IsVisibleProperty,
-            new Binding(nameof(CircuitMapViewModel.PhotoUrl), converter: new NotNullOrEmptyConverter()));
+            new Binding(nameof(CircuitMapViewModel.PhotoSource), converter: new NotNullOrEmptyConverter()));
 
         return block;
     }
