@@ -372,3 +372,31 @@ classification, and a second open served entirely from cache (3 requests total f
 A user with no network can read every race they have already opened and no more - which is the same trade the
 champions screen makes. The alternative, a bulk sync, would trade thousands of requests for a completeness the
 UI cannot show faster than on-demand loading already does.
+
+## ADR-019 — F1's own artwork, hotlinked and credited, never stored
+
+**Context.** The app adopted F1.com's visual language. That language is carried partly by artwork: transparent
+driver cutouts, team car cutouts, white team logos and 16:9 circuit cards. The project's standing rule is that
+every source is public, keyless and anonymous, and that images are used as their publisher issues them.
+
+**Decision.** `media.formula1.com` answers all four asset types with no key and no account, so it qualifies as a
+source on the same terms as OpenF1's payload images. They are **hotlinked** from the CDN, held in a bounded
+in-memory cache for the session, credited on screen ("Formula 1 media"), and never downloaded, resized locally,
+cached to disk or redistributed. Nothing of F1's artwork survives the app closing.
+
+URLs are built from `F1MediaCatalog`, a table of identifiers verified one by one with real requests: 24 driver
+cutouts, 11 team cars and logos, 22 of 23 circuit cards today (the 2026 Abu Dhabi card returns 404 at the shared
+slug pattern, and the official page publishes no card for that round either — so it is absent, not guessed). An
+identifier that is not in the table resolves to `null` and **no request is made for it**: the screen draws the
+OpenF1 track icon, the provider headshot, a Commons portrait, or a designed initials tile.
+
+**Evidence.** Probes recorded in `docs/agent/findings.md`: every listed asset answered 200; the sizes are
+real (driver cutout 124 KB at `w_720`, car 20–41 KB, circuit card 39 KB, logo 746 B). `F1MediaCatalogTests`
+pins the exact URL strings so a tidy-up cannot invent a prettier path, and `F1ImageResolverTests` covers the
+404-then-fallback path with a stub handler.
+
+**Consequences.** This is F1's copyrighted artwork and the app is a personal, sideloaded build — the same
+position ADR-016 already took for provider-supplied portraits, extended to cars, logos and circuit art. F1 can
+change or withdraw these paths at any time; the fallback chain means a withdrawal degrades the screens rather
+than breaking them, and a new season needs the tables extended and re-verified. The catalogue is the cost of
+honesty here: an id we have not verified is an id we do not request.

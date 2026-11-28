@@ -56,7 +56,8 @@ public sealed class DefaultSessionResolver
                 latest.SessionKey,
                 $"{schedule.Circuit.ShortName} {latest.Name}",
                 latest.Start.AddMinutes(10),
-                schedule.Circuit.Id);
+                schedule.Circuit.Id,
+                schedule.MeetingName);
         }
 
         // Race weekend has not started: replay the most recent completed race of the season instead of
@@ -84,6 +85,7 @@ public sealed class DefaultSessionResolver
             mostRecent.RaceSessionKey,
             $"{mostRecent.Circuit.ShortName} {mostRecent.RaceStart.Year} · Race",
             mostRecent.RaceStart.AddMinutes(10),
-            mostRecent.Circuit.Id);
+            mostRecent.Circuit.Id,
+            mostRecent.Circuit.Name);
     }
 }

@@ -1,4 +1,6 @@
+#if WINDOWS
 using System.Runtime.InteropServices;
+#endif
 using F1App.Features.Archive;
 using F1App.Features.Compare;
 using F1App.Features.Facts;
@@ -210,6 +212,23 @@ public sealed partial class AppShell : Shell
 
         if (IsPhone)
         {
+            // A phone shell in a desktop window is not a phone layout: without this the walk rendered the
+            // phone arrangement at 1400 pt and the screenshots answered nothing. 390x844 is a current phone.
+            if (Window is { } phoneWindow)
+            {
+                try
+                {
+                    phoneWindow.Width = 390;
+                    phoneWindow.Height = 844;
+                    await Task.Delay(TimeSpan.FromSeconds(2));
+                    Diagnostics.Write("INFO", null, "phone: window resized to 390x844");
+                }
+                catch (Exception exception)
+                {
+                    Diagnostics.Write("PAGE", exception, "phone resize");
+                }
+            }
+
             // Five tabs, then the nine secondary screens as pushes - the same pages, reached the other way.
             foreach (var route in new[] { "season", "pitwall", "archive", "paddock", "more" })
             {
@@ -229,6 +248,16 @@ public sealed partial class AppShell : Shell
             foreach (var route in tabs)
             {
                 await WalkOneAsync($"//{route}", route);
+
+                if (route == "season" && Environment.GetEnvironmentVariable("F1APP_THEMEFLIP") == "1")
+                {
+                    Themes.Apply(ThemeMode.Light);
+                    await Task.Delay(900);
+                    await CaptureAsync("theme-light");
+                    Themes.Apply(ThemeMode.Dark);
+                    await Task.Delay(900);
+                    await CaptureAsync("theme-dark");
+                }
 
                 if (route == "pitwall" && Shell.Current?.CurrentPage is PitWallPage pit)
                 {
@@ -254,6 +283,7 @@ public sealed partial class AppShell : Shell
     /// </remarks>
     private static async Task PressPitWallTabsAsync(PitWallPage pit)
     {
+#if WINDOWS
         if (Environment.GetEnvironmentVariable("F1APP_CLICK") == "1")
         {
             foreach (var section in new[] { 2, 0, 3, 2 })
@@ -270,6 +300,7 @@ public sealed partial class AppShell : Shell
             Diagnostics.Write("INFO", null, "pitwall tabs clicked");
             return;
         }
+#endif
 
         for (var section = 0; section < 4; section++)
         {
@@ -295,6 +326,7 @@ public sealed partial class AppShell : Shell
     /// Calling the handler directly is not the same thing: a pointer click reaches XAML's input and focus
     /// machinery first. The reported crash only exists on that path.
     /// </remarks>
+#if WINDOWS
     private static void ClickAt(Button button)
     {
         if (button?.Handler?.PlatformView is not Microsoft.UI.Xaml.FrameworkElement native)
@@ -356,6 +388,7 @@ public sealed partial class AppShell : Shell
         [DllImport("user32.dll")]
         internal static extern void mouse_event(uint flags, int dx, int dy, uint data, UIntPtr extra);
     }
+#endif
 
     private static string ShotsFolder() => Path.Combine(FileSystem.CacheDirectory, "shots");
 

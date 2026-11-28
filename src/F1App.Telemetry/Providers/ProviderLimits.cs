@@ -19,14 +19,28 @@ public static class ProviderLimits
     /// <summary>Requests allowed back to back before the gate starts spacing them out.</summary>
     public const int OpenF1Burst = 3;
 
-    /// <summary>Jolpica publishes no figure on its landing page; this is the self-imposed cap.</summary>
-    public const int JolpicaPerMinute = 120;
+    /// <summary>Jolpica unauthenticated: 500 requests per hour sustained.</summary>
+    /// <remarks>
+    /// Published, not guessed: <c>jolpica/jolpica-f1/docs/rate_limits.md</c> ("Burst Limit: 4 requests per
+    /// second, Sustained Limit: 500 requests per hour", checked 2026-11-22). The limits are per IP, so every
+    /// Jolpica client shares one gate - two buckets would send twice the budget the provider counts.
+    /// </remarks>
+    public const int JolpicaPerHour = 500;
 
     /// <summary>Wikimedia Commons asks clients to be conservative; this is deliberately low.</summary>
     public const int CommonsPerMinute = 30;
 
     /// <summary>RSS publishers vary wildly; one conservative bucket covers all of them.</summary>
     public const int NewsPerMinute = 20;
+
+    /// <summary>
+    /// Per-minute pacing that stays under the hourly cap: 8 x 60 = 480 requests an hour.
+    /// </summary>
+    /// <remarks>
+    /// The gate paces per minute and the provider counts per hour, so the per-minute figure is derived
+    /// from <see cref="JolpicaPerHour"/> with a margin rather than chosen.
+    /// </remarks>
+    public const int JolpicaPerMinute = 8;
 
     /// <summary>Burst allowed for each provider, matching the gate the client builds.</summary>
     public const int JolpicaBurst = 4;

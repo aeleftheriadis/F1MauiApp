@@ -30,7 +30,10 @@ public sealed class PitWallPage : ContentPage, IDisposable
     }
 
     private readonly PitWallViewModel _viewModel;
+    private readonly Image _heroArt = new() { Aspect = Aspect.AspectFill, HeightRequest = 96 };
+    private readonly F1Images _images;
     private readonly NewsViewModel _news;
+    private readonly System.ComponentModel.PropertyChangedEventHandler _onNewsChanged;
     private readonly SessionRunner _runner;
 
     private readonly ObservableCollection<NewsRow> _visibleNews = [];
@@ -45,13 +48,15 @@ public sealed class PitWallPage : ContentPage, IDisposable
     private Button[] _sectionButtons = [];
     private string _newsFilter = "ALL";
 
-    public PitWallPage(PitWallViewModel viewModel, NewsViewModel news, SessionRunner runner)
+    public PitWallPage(PitWallViewModel viewModel, NewsViewModel news, SessionRunner runner, F1Images images)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
         ArgumentNullException.ThrowIfNull(news);
         ArgumentNullException.ThrowIfNull(runner);
+        ArgumentNullException.ThrowIfNull(images);
 
         _viewModel = viewModel;
+        _images = images;
         _news = news;
         _runner = runner;
         BindingContext = viewModel;
@@ -86,14 +91,18 @@ public sealed class PitWallPage : ContentPage, IDisposable
             }
         };
 
-        _news.PropertyChanged += (_, _) =>
+        // Subscribed between load and unload: the view model is a singleton, so a page that listens from
+        // its constructor stays reachable after it is closed and rebuilds lists nobody can see.
+        _onNewsChanged = (_, _) =>
         {
             if (_section is Section.News or Section.Media)
             {
                 RebuildNews();
             }
         };
-        Themes.Changed += (_, _) => Content = BuildContent();
+        Loaded += (_, _) => _news.PropertyChanged += _onNewsChanged;
+        Unloaded += (_, _) => _news.PropertyChanged -= _onNewsChanged;
+        Themes.RebuildOnChange(this, BuildContent);
         A11y.WatchStatus(_viewModel, nameof(PitWallViewModel.Status), () => _viewModel.Status);
     }
 
@@ -209,11 +218,62 @@ public sealed class PitWallPage : ContentPage, IDisposable
             BackgroundColor = Themes.Current.Background,
         };
 
-        layout.Add(BuildHeader(), 0, 0);
-        layout.Add(BuildFocusBanner(), 0, 1);
-        layout.Add(_body, 0, 2);
-        layout.Add(BuildBottomBar(), 0, 3);
+        layout.Add(BuildHero(), 0, 0);
+        layout.Add(BuildHeader(), 0, 1);
+        layout.Add(BuildFocusBanner(), 0, 2);
+        layout.Add(_body, 0, 3);
+        layout.Add(BuildBottomBar(), 0, 4);
         return layout;
+    }
+
+    /// <summary>
+    /// The race's circuit card, above the header.
+    /// </summary>
+    /// <remarks>
+    /// Shown only when the replay carries the race's published name: a slug guessed from a label would be a
+    /// 404 dressed as art. Its absence collapses the row, so nothing shifts for a race the catalogue lacks.
+    /// </remarks>
+    private View BuildHero()
+    {
+        Surfaces.Detach(_heroArt);
+
+        var strip = new Border
+        {
+            StrokeThickness = 0,
+            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 0 },
+            BackgroundColor = Themes.Current.SurfaceMuted,
+            IsVisible = false,
+            Content = _heroArt,
+        };
+
+        var name = _viewModel.MeetingName;
+
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            _ = LoadHeroAsync(strip, name);
+        }
+
+        return strip;
+    }
+
+    private async Task LoadHeroAsync(Border strip, string meetingName)
+    {
+        try
+        {
+            var art = await _images.CircuitForMeetingAsync(meetingName, CancellationToken.None).ConfigureAwait(true);
+
+            if (art is null)
+            {
+                return;
+            }
+
+            _heroArt.Source = art;
+            strip.IsVisible = true;
+        }
+        catch (Exception exception)
+        {
+            Diagnostics.Write("PAGE", exception, "pit wall hero");
+        }
     }
 
     // ---------------------------------------------------------------- header
@@ -930,6 +990,8 @@ public sealed class PitWallPage : ContentPage, IDisposable
             var button = new Button
             {
                 Text = labels[i],
+                // Stable handle for the Ailoha CLI and for any UI test: text is localisable, an id is not.
+                AutomationId = $"PitWallSection{i}",
                 FontSize = 10,
                 FontAttributes = FontAttributes.Bold,
                 HeightRequest = Tokens.MinTouchTarget,

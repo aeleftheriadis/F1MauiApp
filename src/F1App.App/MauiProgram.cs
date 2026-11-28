@@ -1,3 +1,6 @@
+#if DEBUG
+using Ailoha.Agent;
+#endif
 using F1App.Domain;
 using F1App.Features.Archive;
 using F1App.Features.Facts;
@@ -35,26 +38,48 @@ public static class MauiProgram
     public static MauiApp CreateMauiApp()
     {
         var builder = MauiApp.CreateBuilder();
+
         builder
             .UseMauiApp<App>()
-            .UseSkiaSharp();
+            .UseSkiaSharp()
+
+            // Barlow Semi Condensed, SIL OFL 1.1 - the closest open relative of F1's own display face.
+            // The OFL text ships beside the files in Resources/Fonts, as the licence requires.
+            .ConfigureFonts(static fonts =>
+            {
+                fonts.AddFont("BarlowSemiCondensed-Regular.ttf", "BarlowRegular");
+                fonts.AddFont("BarlowSemiCondensed-SemiBold.ttf", "BarlowSemiBold");
+                fonts.AddFont("BarlowSemiCondensed-Bold.ttf", "BarlowBold");
+            });
+
+        // Dev-only, and after UseMauiApp: the agent hooks MAUI's own inspection providers, which do not exist
+        // yet if this runs first. Debug builds only - a release build has no agent and no listening port.
+#if DEBUG
+        builder.AddMauiDevFlowAgent(options => options.EnableProfiler = true);
+#endif
 
         // One gate per provider: the free tiers are per-credential budgets, not per-call.
         // Burst 3: a session load issues three requests back to back (outline, positions, telemetry).
         // Pacing them instead would stall the first screen for seconds for no benefit.
         var openF1Gate = RequestGate.ForRequestsPerMinute(
             ProviderLimits.OpenF1PerMinute, TimeProvider.System, burst: ProviderLimits.OpenF1Burst);
-        var jolpicaGate = RequestGate.ForRequestsPerMinute(10, TimeProvider.System);
+        // One Jolpica gate for every Jolpica client: the hourly cap is per IP, so separate buckets for the
+        // calendar, the champions and the vault would together send several times the published budget.
+        var jolpicaGate = RequestGate.ForRequestsPerMinute(
+            ProviderLimits.JolpicaPerMinute, TimeProvider.System, burst: ProviderLimits.JolpicaBurst);
 
         // Pacing is the gate's job; this pipeline retries what pacing cannot fix (timeouts, 5xx) and stops
         // calling a provider that is failing outright. It never retries a 429 - that is a throttle, not a fault.
         var openF1Resilience = OpenF1Resilience.Create();
 
-        // The champions wall costs one request per season, so it needs its own bucket: pacing it at the
-        // calendar's 6 s interval turned twenty seasons into two minutes. The 24 h cache, not this gate,
-        // is what keeps the hourly total tiny.
-        var factsGate = RequestGate.ForRequestsPerMinute(120, TimeProvider.System, burst: 4);
         var newsGate = RequestGate.ForRequestsPerMinute(20, TimeProvider.System, burst: 10);
+
+        // F1's artwork is hotlinked and held in memory only: no disk cache, nothing to redistribute.
+        builder.Services.AddSingleton(_ => new F1App.Telemetry.Media.ImageMemoryCache(capacity: 96));
+        builder.Services.AddSingleton(sp => new F1App.Telemetry.Media.F1ImageResolver(
+            sp.GetRequiredService<HttpClient>(),
+            sp.GetRequiredService<F1App.Telemetry.Media.ImageMemoryCache>()));
+        builder.Services.AddSingleton<F1Images>();
 
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<IClock, SystemClock>();
@@ -81,10 +106,11 @@ public static class MauiProgram
             sp.GetRequiredService<SqlitePayloadCache>(),
             sp.GetRequiredService<TimeProvider>()));
         builder.Services.AddSingleton(sp => new JolpicaClient(sp.GetRequiredService<HttpClient>(), jolpicaGate));
-        builder.Services.AddSingleton(sp => new JolpicaFactsClient(sp.GetRequiredService<HttpClient>(), factsGate));
-        // The vault costs one request per season since 1950 and syncs once, so it shares the facts budget.
-        builder.Services.AddSingleton(sp => new JolpicaRaceVaultClient(sp.GetRequiredService<HttpClient>(), factsGate));
-        builder.Services.AddSingleton(sp => new JolpicaSeasonResultsClient(sp.GetRequiredService<HttpClient>(), factsGate));
+        builder.Services.AddSingleton(sp => new JolpicaFactsClient(sp.GetRequiredService<HttpClient>(), jolpicaGate));
+        // The vault costs one request per season since 1950 and syncs once, resuming where it stopped: at
+        // the published 500/hour it takes about ten minutes the first time, and is then cached for good.
+        builder.Services.AddSingleton(sp => new JolpicaRaceVaultClient(sp.GetRequiredService<HttpClient>(), jolpicaGate));
+        builder.Services.AddSingleton(sp => new JolpicaSeasonResultsClient(sp.GetRequiredService<HttpClient>(), jolpicaGate));
         builder.Services.AddSingleton<ChampionsService>();
         builder.Services.AddSingleton<RaceVaultService>();
         builder.Services.AddSingleton<TeammateDuelService>();

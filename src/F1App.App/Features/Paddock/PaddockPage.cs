@@ -9,6 +9,7 @@ public sealed class PaddockPage : ContentPage
     private readonly PaddockViewModel _viewModel;
     private readonly Image _portrait;
     private readonly Label _noPhoto;
+    private readonly ContentView _carCard;
     private bool _loaded;
     private readonly WidthSwitch _width;
 
@@ -40,13 +41,25 @@ public sealed class PaddockPage : ContentPage
             Themes.Current.TextSecondary);
         _noPhoto.IsVisible = false;
 
+        // The car sits under the portrait, and stays empty until the catalogue resolves one.
+        _carCard = new ContentView { Margin = new Thickness(0, Tokens.Space2, 0, 0) };
+
         Content = BuildContent();
 
-        Themes.Changed += (_, _) => Content = BuildContent();
+        Themes.RebuildOnChange(this, BuildContent);
         A11y.WatchStatus(_viewModel, nameof(PaddockViewModel.Status), () => _viewModel.Status);
         _viewModel.PropertyChanged += (_, args) =>
         {
-            if (args.PropertyName is nameof(PaddockViewModel.PortraitUrl) or nameof(PaddockViewModel.HasNoPortrait))
+            if (args.PropertyName is nameof(PaddockViewModel.CarImage))
+            {
+                ApplyCar();
+                return;
+            }
+
+            if (args.PropertyName is nameof(PaddockViewModel.PortraitUrl)
+                or nameof(PaddockViewModel.Portrait)
+                or nameof(PaddockViewModel.CarImage)
+                or nameof(PaddockViewModel.HasNoPortrait))
             {
                 ApplyPortrait();
             }
@@ -97,6 +110,15 @@ public sealed class PaddockPage : ContentPage
 
     private void ApplyPortrait()
     {
+        if (_viewModel.Portrait is { } resolved)
+        {
+            _portrait.Source = resolved;
+            _portrait.IsVisible = true;
+            _noPhoto.IsVisible = false;
+
+            return;
+        }
+
         var url = _viewModel.PortraitUrl;
 
         if (!string.IsNullOrEmpty(url) && Uri.TryCreate(url, UriKind.Absolute, out var uri))
@@ -109,12 +131,37 @@ public sealed class PaddockPage : ContentPage
             };
             _portrait.IsVisible = true;
             _noPhoto.IsVisible = false;
+
             return;
         }
 
         _portrait.Source = null;
         _portrait.IsVisible = false;
         _noPhoto.IsVisible = _viewModel.HasNoPortrait;
+    }
+
+    /// <summary>Puts the resolved car cutout in the dossier, or leaves the slot empty.</summary>
+    private void ApplyCar()
+    {
+        var car = _viewModel.CarImage;
+
+        if (car is null)
+        {
+            _carCard.Content = null;
+            return;
+        }
+
+        if (_carCard.Content is View existing)
+        {
+            Surfaces.Detach(existing);
+        }
+
+        _carCard.Content = F1Components.TeamCard(
+            _viewModel.TeamName,
+            Themes.Current.SurfaceMuted,
+            car,
+            null,
+            showCredit: false);
     }
 
     /// <summary>Wraps the portrait, and disappears entirely when there is no picture to show.</summary>
@@ -128,9 +175,8 @@ public sealed class PaddockPage : ContentPage
             Margin = new Thickness(0, Tokens.Space1, 0, 0),
             Content = _portrait,
         };
-        frame.SetBinding(
-            IsVisibleProperty,
-            new Binding(nameof(PaddockViewModel.PortraitUrl), converter: new NotNullOrEmptyConverter()));
+        // Bound to the flag, not to the URL: a resolved cutout has no URL string and must still show.
+        frame.SetBinding(IsVisibleProperty, nameof(PaddockViewModel.HasPortrait));
 
         return frame;
     }
@@ -138,8 +184,12 @@ public sealed class PaddockPage : ContentPage
     private View BuildContent()
     {
         // Controls created once in the constructor must leave the old tree before the rebuild.
-        Surfaces.Detach(_portrait, _noPhoto);
+        Surfaces.Detach(_portrait, _noPhoto, _carCard);
 
+
+        // On a phone the dossier is the first thing on screen, and a 190 pt figure plus padding pushed the car
+        // and the roster below the fold. The picture keeps its aspect, it just takes less height.
+        _portrait.HeightRequest = _width.IsWide ? 190 : 150;
 
         var dossier = Surfaces.Card(
             new VerticalStackLayout
@@ -170,6 +220,7 @@ public sealed class PaddockPage : ContentPage
                     Bind(Surfaces.Mono(string.Empty, 10, Themes.Current.TeleCyan),
                         Label.TextProperty, nameof(PaddockViewModel.ChampionshipLine)),
                     PhotoFrame(),
+                    _carCard,
                     _noPhoto,
                     Bind(Surfaces.Mono(string.Empty, 9, Themes.Current.TextSecondary),
                         Label.TextProperty, nameof(PaddockViewModel.PortraitCaption)),

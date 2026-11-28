@@ -124,3 +124,109 @@ Evidence, measurements and dead ends. Newest last.
 - Found while bisecting, not fixed: `Themes.Changed` (a static event) and `NewsViewModel.PropertyChanged`
   (a singleton view model) are subscribed by every page constructor and never unsubscribed, so closed pages stay
   reachable and rebuild their content. Recorded as an open item in tasks.md.
+- 2026-11-22 **Jolpica rate limit, verified**: the published figures are burst **4 requests/second** and
+  sustained **500 requests/hour** (unauthenticated), from `jolpica/jolpica-f1/docs/rate_limits.md`. The app had
+  been pacing Jolpica at **120/min (~7 200/hour) in one bucket plus a second 120/min bucket for the champions
+  wall**, i.e. roughly fifteen times the published budget - and two buckets defeat the point of a gate, since
+  the limit is counted per IP. Now one gate: `ProviderLimits.JolpicaPerMinute = 8` (480/hour) with burst 4,
+  injected into every Jolpica client. `ProviderLimitsTests` asserts the arithmetic so the figure cannot drift
+  back. Consequence, stated plainly: a first full vault sync (77 seasons) now takes about ten minutes instead
+  of one, which is why the Archive reports "syncing archive: N/77 seasons" and the sync resumes where it stops.
+- 2026-11-22 **F1 media CDN, measured** (all keyless): driver cutouts at
+  `.../common/f1/2026/<team>/<drvid>/2026<team><drvid>right.webp` — 24/24 answered 200 at `w_720` (124 KB);
+  team cars `2026<team>carright.webp` — 11/11 200, 20–41 KB, and `w_2000` also 200; team logos
+  `2026<team>logowhite.webp` 746 B; circuit cards `fom-website/static-assets/2026/races/card/<slug>.webp` —
+  22 of 23 200, **`united-arab-emirates` is 404** (the official calendar page publishes no card for that
+  round either). Paths are constructed, not published as a contract: OpenF1's `headshot_url` is a different,
+  older scheme (`content/dam/fom-website/drivers/...transform/1col/image.png`, the 93 px crop), so the good
+  cutouts exist only in a table of verified ids, with fallbacks.
+- 2026-11-28 **Ailoha set up** (CLI 0.2.4, package `Ailoha.Agent.Maui` 0.2.4 via CPM, registered `#if DEBUG`
+  after `UseMauiApp`). Working end to end: `agent list`, `diagnose`, `device app`, `ui screenshot`,
+  `ui tap <AutomationId>`, `logs`. Proven rather than assumed — `ui tap PitWallSection2` switched the pit wall to
+  NEWS and the screenshot showed it.
+  **Broken in the CLI, not the app:** `ui tree` and `ui query` both return `[]`, while the agent's own HTTP API
+  answers with the full tree (`curl "http://127.0.0.1:11233/api/v1/ui/tree?depth=16"` → Window → AppShell →
+  FlyoutItems → PitWallPage → Grids/Labels/Buttons). Passing `--agent-port` explicitly changes nothing, so the
+  CLI is the failing layer. Workaround: read the tree over HTTP, address elements by AutomationId.
+  **Side effect worth knowing:** this agent serialises a control's `AutomationId` into the tree's `text` field,
+  so adding ids to the pit-wall section buttons made `ui query --text "TIMING"` stop matching them. Ids are the
+  better handle; text queries simply will not match an element that has one.
+- 2026-11-28 **Ailoha, debug-only verified both ways.** Debug: the three Ailoha assemblies are in the output,
+  `agent wait` returns the agent on port 11233, `device app` names the app, `ui tap PitWallSection0` and a
+  screenshot confirm it drives the app. Release: no Ailoha assembly in the output, the running process opens no
+  port, and its stdout never mentions Ailoha. The package reference is conditioned on `Configuration == Debug`
+  as well as the registration, so a release build cannot ship the agent even by accident.
+  Note for whoever tests this next: `agent list` keeps stale entries after an app exits (it reported 2 agents
+  with none running), so it is not evidence either way — the output folder and the process's own listening
+  socket are.
+- 2026-11-28 **the meeting name was missing from the app, not just from `SessionRequest`.** `WeekendSchedule`
+  already had a `MeetingName` field, but the weekend loader filled it with `"LOSAIL 2026"` — a circuit and a year,
+  not a race. OpenF1's *sessions* payload carries `meeting_key` but no name; the *meetings* payload carries
+  `meeting_name` ("Qatar Grand Prix") and was already cached, so the loader now joins it by key. Consequence:
+  the pit wall can show its circuit card, and the catalogue can be keyed on real race names. Names still differ
+  per publisher — Jolpica says "Brazilian Grand Prix", OpenF1 says "São Paulo Grand Prix" — so the media catalogue
+  accepts both and a test pins that they resolve to the same verified card.
+- 2026-11-28 **"phone shell in a desktop window" was not a phone pass.** `F1APP_PHONE=1` switched the shell but
+  left the window at ~1400 pt, so the screenshots showed the phone *arrangement* at desktop width and answered
+  nothing; the harness even skipped its resize loop in phone mode. With the window at 390x844: Paddock's portrait
+  ate a third of the screen, and the Results classification clipped four columns (S1/S2/S3 above all, plus GAP,
+  TYRE, PIT and OFFICIAL off-screen) with no way to reach them. Both fixed and re-shot. The WinUI tab bar shows
+  two of five tabs plus an overflow at that width — noted, not patched, because Android draws its own bar and is
+  the shipping target.
+- 2026-11-28 **Ailoha on Android, checked for real** (emulator `pixel_7_-_api_36_0`, API 36 x86_64). Four things
+  had to be fixed to get there, and the last two are defects in this project rather than the environment:
+  1. `ANDROID_HOME` points at `%LOCALAPPDATA%\Android\Sdk`, which holds **only platform-tools**. The real SDK
+     lives at `C:\Program Files (x86)\Android\android-sdk` (build-tools 36/37, platforms 36/37, emulator,
+     android-36 system image). Every tool inherits the wrong root, so pass `-p:AndroidSdkDirectory=...` and set
+     `ANDROID_SDK_ROOT` for the emulator. This is why the earlier Android build failed with `XA5205 aapt2`.
+  2. **My own bug:** the `F1APP_CLICK` real-pointer harness used `Microsoft.UI.Xaml` and `WinRT.Interop`
+     unguarded, so the Android TFM did not compile at all (5 errors, all in `AppShell.cs`). Now `#if WINDOWS`.
+  3. **Debug APKs use fast deployment**: `adb install` of a Debug APK ships a runtime with no
+     `System.Private.CoreLib.dll`, and the app aborts at `host.cc:452` during runtime init with
+     `CLR error: Failed to load System.Private.CoreLib.dll`. Build with `-p:EmbedAssembliesIntoApk=true` when
+     installing by hand.
+  4. **Android chrome was .NET purple** (`#512BD4` from the template's `colors.xml`), which Windows never showed
+     because the Shell paints its own bar there. Now the app palette; verified by screenshot.
+  Result: `[Ailoha.Agent] HTTP server started on port 9233` in logcat, `adb forward tcp:9233 tcp:9233`, and then
+  `ailoha android device app` / `ui screenshot` work against the emulator. The Android tab bar draws **all five
+  destinations with icons**, unlike WinUI at 390 pt which collapses to two plus an overflow.
+
+- 2026-11-28 **official live-timing hub, probed between sessions.** `OfficialLiveTimingClient.ObserveAsync` ran for
+  20 s at ~09:50 UTC (Qatar weekend, between Practice 2 and Practice 3): negotiate answered, the WebSocket
+  connected, the subscribe was accepted, and exactly **one** frame arrived — `{"type":6}`, SignalR's keepalive.
+  Nothing else, which is what the type's remarks already claimed but had never been measured with a capture file.
+  An 8 s probe caught zero frames (the keepalive is every 15–30 s), so a short probe outside a session proves only
+  that the connection works. `tools/live-probe/probe.cs` reproduces this without the UI.
+
+- 2026-11-28 **Archive scroll measured, and the first measurement was worthless.** On the emulator with
+  `-gpu swiftshader_indirect` (software) a 20-swipe scroll measured **72.5% janky, p50 65 ms** for the 740-row
+  Archive — and **72.88%, p50 81 ms** for the 23-row Season screen. Identical, which means the instrument was the
+  bottleneck and the comparison proved nothing. Re-run with `-gpu host` (Intel UHD 630):
+
+  | screen | frames | janky | p50 | p90 |
+  | --- | --- | --- | --- | --- |
+  | Season, 23 rows | 336 | 9.52% | 31 ms | 46 ms |
+  | Archive, 740+ rows | 299 | 24.08% | 34 ms | 57 ms |
+
+  So the long list does cost about 2.5x the jank of a short one, on this hardware. Two honest limits: it is still
+  an emulator with an integrated GPU, so a flagship phone will be better and a cheap one worse; and the baseline
+  itself (9.5% on 23 rows) is not excellent, so the row template may be worth a look before blaming row count.
+  Incremental loading is therefore **not** proven necessary — the numbers say "measurable", not "unusable".
+- Lesson worth keeping: an A/B where both sides are equally bad is not evidence. Measure a control before
+  concluding a screen is slow.
+
+- 2026-11-28 **Archive row template: fixed height tested, floor not explained.** Each Archive row is seven labels
+  inside six nested containers, and its height was a `MinimumHeightRequest`, so every row was measured. Setting a
+  fixed 64 pt height (same 20-swipe run, hardware GPU) moved janky from 24.08% to **23.23%** and p90 from 57 ms to
+  **48 ms**, p50 34 -> 32 ms. So the change is worth keeping for the tail and does **not** explain the ~9.5%
+  baseline a 23-row screen also shows. The remaining suspect is element count per row; testing that means
+  redesigning the row, which is a layout change rather than a knob, so it is left as a decision.
+
+- 2026-11-28 **the capture tool now answers the parser question, and proved it can say yes.** `probe.cs` reads
+  the capture and reports what `TimingDataParser` makes of it, with three distinct verdicts: real TimingData
+  arrived, the hub was silent, or the file is not one JSON object per line. All three were exercised:
+  a keepalive-only capture from the hub -> "sent no TimingData"; the unit-test fixture written pretty-printed ->
+  "not one JSON object per line" (11 lines, none valid); the same fixture compacted to one line -> "real
+  TimingData arrived, 3 standings across 3 drivers", matching what the unit test asserts.
+  The middle case is the one worth keeping: without it, a pretty-printed capture would have read exactly like a
+  silent hub at 14:30, and the wrong conclusion would have been recorded as fact.

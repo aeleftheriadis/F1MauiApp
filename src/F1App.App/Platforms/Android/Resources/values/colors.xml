@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="colorPrimary">#512BD4</color>
-    <color name="colorPrimaryDark">#2B0B98</color>
-    <color name="colorAccent">#2B0B98</color>
+    <!-- The template's .NET purple showed up as the status bar and action bar on Android, while Windows drew
+         our palette: the platform theme is what paints chrome the Shell does not own. These are the app's
+         colours, so Android chrome matches the screens instead of clashing with them. -->
+    <color name="colorPrimary">#15151E</color>
+    <color name="colorPrimaryDark">#15151E</color>
+    <color name="colorAccent">#E10600</color>
 </resources>

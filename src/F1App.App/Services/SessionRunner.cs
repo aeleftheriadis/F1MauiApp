@@ -10,7 +10,13 @@ namespace F1App.Services;
 /// <param name="Label">Operator-facing identity, shown next to the data.</param>
 /// <param name="From">Start of the replay window.</param>
 /// <param name="CircuitId">Circuit slug, so the map can tell whether it belongs to this replay.</param>
-public sealed record SessionRequest(int SessionKey, string Label, DateTimeOffset From, string CircuitId);
+/// <param name="MeetingName">Race name as published, e.g. <c>Qatar Grand Prix</c>, or null when unknown.</param>
+public sealed record SessionRequest(
+    int SessionKey,
+    string Label,
+    DateTimeOffset From,
+    string CircuitId,
+    string? MeetingName = null);
 
 /// <summary>
 /// Loads the selected session from OpenF1 and streams it into the snapshot store.
@@ -79,6 +85,9 @@ public sealed class SessionRunner : IAsyncDisposable
     /// <summary>Circuit slug of the session being replayed.</summary>
     public string CircuitId { get; private set; } = string.Empty;
 
+    /// <summary>Race name as the feeds publish it, or empty when the request did not carry one.</summary>
+    public string MeetingName { get; private set; } = string.Empty;
+
     /// <summary>OpenF1 key of the session being replayed.</summary>
     public int SessionKey { get; private set; }
 
@@ -120,6 +129,7 @@ public sealed class SessionRunner : IAsyncDisposable
             FailureReason = null;
             SessionLabel = request.Label;
             CircuitId = request.CircuitId;
+            MeetingName = request.MeetingName ?? string.Empty;
             SessionKey = request.SessionKey;
             Start();
         }
@@ -187,6 +197,7 @@ public sealed class SessionRunner : IAsyncDisposable
             _request = request;
             SessionLabel = request.Label;
             CircuitId = request.CircuitId;
+            MeetingName = request.MeetingName ?? string.Empty;
             SessionKey = request.SessionKey;
 
             var loaded = await _loader
@@ -206,6 +217,7 @@ public sealed class SessionRunner : IAsyncDisposable
                     Loaded = session;
                     SessionLabel = session.Label;
                     CircuitId = request.CircuitId;
+            MeetingName = request.MeetingName ?? string.Empty;
                     SessionKey = request.SessionKey;
                     FailureReason = null;
                     _store.Reset();

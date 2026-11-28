@@ -23,7 +23,7 @@ public sealed class NewsPage : ContentPage
         A11y.WatchStatus(viewModel, nameof(NewsViewModel.Status), () => viewModel.Status);
 
         ToolbarItems.Add(new ToolbarItem("Refresh", null, async () => await RefreshAsync(force: true)));
-        Themes.Changed += (_, _) => Content = BuildContent();
+        Themes.RebuildOnChange(this, BuildContent);
     }
 
     private View BuildContent()

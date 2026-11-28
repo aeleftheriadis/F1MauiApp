@@ -71,6 +71,22 @@ public sealed class OpenF1WeekendLoader
 
         var circuit = Circuit.FromProvider(shortName, head.Location, head.CountryName);
 
+        // The sessions payload carries a meeting key but not its name, so the meetings list is joined in.
+        // It is one request per season and already cached, and "Qatar Grand Prix" is what the screens and the
+        // F1 media catalogue key on - "Lusail 2026" is a circuit and a year, not a race.
+        var name = head.MeetingKey.ToString(CultureInfo.InvariantCulture);
+        var published = await _client.GetMeetingsAsync(head.Year, cancellationToken).ConfigureAwait(false);
+
+        if (published is ImmutableArray<OpenF1Meeting> known)
+        {
+            var match = known.FirstOrDefault(entry => entry.MeetingKey == head.MeetingKey);
+
+            if (!string.IsNullOrWhiteSpace(match?.MeetingName))
+            {
+                name = match.MeetingName;
+            }
+        }
+
         var slots = meeting
             .Select(static session => new SessionSlot(
                 session.SessionKey,
@@ -82,7 +98,9 @@ public sealed class OpenF1WeekendLoader
 
         return new WeekendSchedule(
             head.MeetingKey,
-            string.Create(CultureInfo.InvariantCulture, $"{circuit.ShortName} {head.Year}"),
+            string.IsNullOrWhiteSpace(name)
+                ? string.Create(CultureInfo.InvariantCulture, $"{circuit.ShortName} {head.Year}")
+                : name,
             circuit,
             slots);
     }

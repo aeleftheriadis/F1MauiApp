@@ -13,6 +13,11 @@
     <PackageVersion Include="SkiaSharp.Views.Maui.Controls" Version="3.119.0" />
   </ItemGroup>
 
+  <!-- Dev-only agent for UI inspection from the Ailoha CLI; registered inside #if DEBUG only. -->
+  <ItemGroup Label="Developer tooling">
+    <PackageVersion Include="Ailoha.Agent.Maui" Version="0.2.4" />
+  </ItemGroup>
+
   <ItemGroup Label="Runtime">
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="11.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Debug" Version="11.0.0" />

@@ -26,7 +26,7 @@ public sealed class RaceDetailPage : ContentPage
         Content = BuildContent();
 
         A11y.WatchStatus(_viewModel, nameof(RaceDetailViewModel.Status), () => _viewModel.Status);
-        Themes.Changed += (_, _) => Content = BuildContent();
+        Themes.RebuildOnChange(this, BuildContent);
     }
 
     /// <summary>Tells the page which race to show; called by the archive before navigating.</summary>

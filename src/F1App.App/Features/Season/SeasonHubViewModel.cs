@@ -160,7 +160,8 @@ public sealed partial class SeasonHubViewModel : ObservableObject
                     $"{round.Name} {year} · Race",
                     // Ten minutes in, the same offset Results uses: past the start and into running order.
                     round.RaceStart.AddMinutes(10),
-                    round.CircuitId),
+                    round.CircuitId,
+                    round.Name),
                 cancellationToken)
             .ConfigureAwait(true);
 

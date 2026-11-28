@@ -34,6 +34,7 @@ public sealed record PaddockDriver(
 public sealed partial class PaddockViewModel : ObservableObject
 {
     private readonly SessionRunner _runner;
+    private readonly F1Images _f1Images;
     private readonly WikimediaImageClient _images;
     private readonly SqliteMediaCache _cache;
     private readonly TeammateDuelService _duels;
@@ -44,6 +45,7 @@ public sealed partial class PaddockViewModel : ObservableObject
 
     public PaddockViewModel(
         SessionRunner runner,
+        F1Images f1Images,
         WikimediaImageClient images,
         SqliteMediaCache cache,
         TeammateDuelService duels,
@@ -51,6 +53,7 @@ public sealed partial class PaddockViewModel : ObservableObject
         TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(runner);
+        ArgumentNullException.ThrowIfNull(f1Images);
         ArgumentNullException.ThrowIfNull(images);
         ArgumentNullException.ThrowIfNull(cache);
         ArgumentNullException.ThrowIfNull(duels);
@@ -58,6 +61,7 @@ public sealed partial class PaddockViewModel : ObservableObject
         ArgumentNullException.ThrowIfNull(timeProvider);
 
         _runner = runner;
+        _f1Images = f1Images;
         _images = images;
         _cache = cache;
         _duels = duels;
@@ -98,6 +102,22 @@ public sealed partial class PaddockViewModel : ObservableObject
     /// <summary>Preview URL for the dossier photo, or <see langword="null"/> when there is none.</summary>
     [ObservableProperty]
     public partial string? PortraitUrl { get; set; }
+
+    /// <summary>The driver's picture, already resolved to a source the image control can show.</summary>
+    [ObservableProperty]
+    public partial ImageSource? Portrait { get; set; }
+
+    /// <summary>The team's car cutout, or null when the catalogue does not carry it.</summary>
+    [ObservableProperty]
+    public partial ImageSource? CarImage { get; set; }
+
+    /// <summary>The selected driver's team, as the feed names it.</summary>
+    [ObservableProperty]
+    public partial string TeamName { get; set; }
+
+    /// <summary>True when there is any picture to show, from any of the three sources.</summary>
+    [ObservableProperty]
+    public partial bool HasPortrait { get; set; }
 
     /// <summary>Author and licence, shown under any photo. Empty when there is no photo.</summary>
     [ObservableProperty]
@@ -234,22 +254,33 @@ public sealed partial class PaddockViewModel : ObservableObject
         var driver = Drivers[index];
 
         DossierName = driver.Name;
+        TeamName = driver.Team;
         DossierColour = driver.Colour;
         DossierDetail = string.Create(
             CultureInfo.InvariantCulture,
             $"#{driver.Number} · {driver.Code} · {driver.Team}");
         PortraitUrl = null;
+        Portrait = null;
+        CarImage = null;
+        HasPortrait = false;
         PortraitCaption = string.Empty;
         HasNoPortrait = false;
         ApplyDuel();
         ApplyChampionship();
 
-        // The provider's own headshot first: it is the current season's picture of the right driver, and it
-        // needs no search. Commons is the fallback for the one driver it omits, and carries the licence text.
-        if (!string.IsNullOrWhiteSpace(driver.HeadshotUrl))
+        // F1's own cutout first, then the provider's headshot, then Commons. All three are hotlinked and
+        // credited; only the last one carries a licence that needs naming on screen.
+        var headshot = Uri.TryCreate(driver.HeadshotUrl, UriKind.Absolute, out var headshotUri) ? headshotUri : null;
+        var cutout = await _f1Images
+            .DriverAsync(driver.Code, headshot, null, cancellationToken)
+            .ConfigureAwait(true);
+
+        if (cutout is not null)
         {
-            PortraitUrl = driver.HeadshotUrl;
-            PortraitCaption = "Portrait: Formula 1 media, via OpenF1";
+            Portrait = cutout;
+            HasPortrait = true;
+            PortraitCaption = F1Components.F1MediaCredit;
+            CarImage = await _f1Images.CarAsync(driver.Team, cancellationToken).ConfigureAwait(true);
             return;
         }
 
@@ -296,11 +327,14 @@ public sealed partial class PaddockViewModel : ObservableObject
         {
             HasNoPortrait = true;
             PortraitUrl = null;
+            Portrait = null;
+            HasPortrait = false;
             PortraitCaption = string.Empty;
             return;
         }
 
         HasNoPortrait = false;
+        HasPortrait = true;
         PortraitUrl = image.PreviewUrl;
 
         // Licence terms: author and licence travel with the picture.

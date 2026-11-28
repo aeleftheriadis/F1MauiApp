@@ -55,7 +55,7 @@ public sealed class ComparePage : ContentPage, IDisposable
         Content = BuildContent();
 
         // The palette swap is the C# equivalent of a dictionary swap: rebuild from the new palette.
-        Themes.Changed += (_, _) => Content = BuildContent();
+        Themes.RebuildOnChange(this, BuildContent);
 
         // The replay can be switched from another screen, so poll the runner once a second.
         _timer = Dispatcher.CreateTimer();

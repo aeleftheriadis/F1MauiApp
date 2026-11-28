@@ -14,7 +14,7 @@ Every data source must be public, free and anonymous: **no API key, no OAuth, no
 | Source | Used for | Auth | Free-tier limit |
 | --- | --- | --- | --- |
 | OpenF1 (`api.openf1.org/v1`) — full endpoint inventory and the measured state of every unused endpoint are in `docs/plan.md` | meetings, sessions, `location`, `car_data`, `laps`, `intervals`, `stints`, `pit`, `position` — 2023 onwards, including the next season's calendar (verified: 2027 lists 24 circuits, Mar–Dec) | none | 3 req/s, 30 req/min (enforced: a burst of 5 returns 429) |
-| Jolpica-F1 (`api.jolpi.ca/ergast/f1`) | calendar, results, standings, champions | none | not published on the API landing page (**unverified**); self-limited to 120/min, burst 4, plus a 24 h cache |
+| Jolpica-F1 (`api.jolpi.ca/ergast/f1`) | calendar, results, standings, champions, race vault, race detail | none | **published**: burst 4/s, sustained **500/hour** (`jolpica/jolpica-f1/docs/rate_limits.md`, checked 2026-11-22). One shared gate paced at 8/min (480/hour) with burst 4, because the cap is per IP; plus the 24 h cache |
 
 **Measured disagreement:** for 2026 OpenF1 lists 25 race sessions and Jolpica 23; the two Jolpica lacks
 are 2026-04-12 and 2026-04-19. Jolpica is the incomplete source here, so **OpenF1 owns the circuit list**

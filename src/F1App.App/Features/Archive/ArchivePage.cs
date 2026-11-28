@@ -33,7 +33,7 @@ public sealed class ArchivePage : ContentPage
         Content = BuildContent();
 
         A11y.WatchStatus(_viewModel, nameof(ArchiveViewModel.Status), () => _viewModel.Status);
-        Themes.Changed += (_, _) => Content = BuildContent();
+        Themes.RebuildOnChange(this, BuildContent);
     }
 
     /// <inheritdoc />
@@ -286,6 +286,12 @@ public sealed class ArchivePage : ContentPage
         };
 
         var card = Surfaces.Row(body, Thickness.Zero);
+
+        // A fixed three-line height rather than a minimum: measured with dumpsys gfxinfo on the emulator, this
+        // cut the 90th-percentile frame from 57 ms to 48 ms while leaving the janky share unchanged (~23-24%).
+        // It is a small, real improvement to the tail and no improvement to the average, so the per-row element
+        // count - seven labels in six containers - remains the unexplained part.
+        card.HeightRequest = 64;
         card.SetBinding(SemanticProperties.DescriptionProperty, nameof(ArchiveRaceRow.AccessibleText));
 
         // Tapping a race opens it in full: classification, qualifying and pit stops, fetched on demand.
